@@ -29,6 +29,7 @@ endif()
 
 include_directories(3rd/imgui 3rd/imgui/backends)
 set(ImGui_Glut_src 3rd/imgui/imgui.cpp 3rd/imgui/imgui_demo.cpp 3rd/imgui/imgui_draw.cpp 3rd/imgui/imgui_widgets.cpp
+        3rd/imgui/imgui_tables.cpp
         3rd/imgui/backends/imgui_impl_glut.cpp 3rd/imgui/backends/imgui_impl_opengl2.cpp)
 
 
