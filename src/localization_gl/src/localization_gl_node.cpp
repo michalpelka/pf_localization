@@ -13,6 +13,10 @@
 #include <pcl/common/transforms.h>
 #include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
+
+#include "structs.h"
+#include "pf.h"
+
 const unsigned int window_width = 1920;
 const unsigned int window_height = 1080;
 int mouse_old_x, mouse_old_y;
@@ -26,6 +30,7 @@ std::mutex mtx_input_data;
 pcl::PointCloud<pcl::PointXYZI> input_data;
 Eigen::Affine3d odometry {Eigen::Affine3d::Identity()};
 Eigen::Affine3d odometry_increment{Eigen::Affine3d::Identity()};
+HostDeviceData host_device_data;
 
 void display();
 void reshape(int w, int h);
@@ -65,11 +70,12 @@ void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
 }
 int main (int argc, char *argv[])
 {
+	//ToDo data.host_map -> load map from file
+	initialize_host_device_data(host_device_data);
+
     ros::init(argc, argv, "localization_gl");
     ros::NodeHandle n;
-    ros::Subscriber sub1 = n.subscribe("/velodyne_points", 1, pointcloud_callback);
-    ros::Subscriber sub2 = n.subscribe("/odometry/filtered", 1, odometry_callback);
-
+    ros::Subscriber sub = n.subscribe("/velodyne_points", 1, pointcloud_callback);
 
     std::thread gl_th(gl_main, argc, argv);
     ros::spin();
@@ -118,6 +124,11 @@ void display() {
         }
         glEnd();
     }
+
+    //ToDo data -> render map from file
+
+    ///////////////////////
+
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
     ImGui::Begin("Demo Window1");
