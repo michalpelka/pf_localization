@@ -27,6 +27,16 @@ if(GLUT_FOUND)
     message ("GLUT_glut_LIBRARY: " ${GLUT_glut_LIBRARY})
 endif()
 
+find_package(CUDA 10.0 REQUIRED)
+if(CUDA_FOUND)
+    message("CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
+    message("CUDA_LIBRARIES: ${CUDA_LIBRARIES}")
+    message("CUDA_CUBLAS_LIBRARIES: ${CUDA_CUBLAS_LIBRARIES}")
+    message("CUDA_cusolver_LIBRARY: ${CUDA_cusolver_LIBRARY}")
+endif()
+
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ;-gencode arch=compute_53,code=sm_53 ;-gencode arch=compute_61,code=sm_61;-gencode arch=compute_75,code=sm_75; -Xptxas -v;--expt-extended-lambda;-std=c++14)
+
 include_directories(3rd/imgui 3rd/imgui/backends)
 set(ImGui_Glut_src 3rd/imgui/imgui.cpp 3rd/imgui/imgui_demo.cpp 3rd/imgui/imgui_draw.cpp 3rd/imgui/imgui_widgets.cpp
         3rd/imgui/imgui_tables.cpp
@@ -154,7 +164,10 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src})
+#add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src})
+
+cuda_add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src})
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

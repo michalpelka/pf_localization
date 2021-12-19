@@ -119,15 +119,11 @@ void display() {
     ImGui::Text("Text");
     ImGui::End();
 
-
     ImGui::Render();
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
     glutSwapBuffers();
     glutPostRedisplay();
-
 }
-
-
 
 void mouse(int glut_button, int state, int x, int y) {
     ImGuiIO& io = ImGui::GetIO();
