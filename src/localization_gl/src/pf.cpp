@@ -308,9 +308,9 @@ void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::ve
 		update_poses(data, pose_update);
 		compute_overlaps(data, points_local);
 
-		for(size_t i = 0 ; i < data.particles.size(); i++){
-			std::cout << data.particles[i].overlap << " ";
-		}
+		//for(size_t i = 0 ; i < data.particles.size(); i++){
+		//	std::cout << data.particles[i].overlap << " ";
+		//}
 
 	}
 
