@@ -17,7 +17,15 @@ void initialize_host_device_data(HostDeviceData& data)
 			data.device_map_size,
 			data.map_grid3Dparams), __FILE__, __LINE__);
 
+	data.device_occupancy_map_size = data.map_grid3Dparams.number_of_buckets;
+	data.host_occupancy_map.resize(data.device_occupancy_map_size);
 
+	compute_occupancy(data.host_map, data.map_grid3Dparams, data.host_occupancy_map);
+
+	cudaMalloc((void **)&data.device_occupancy_map, sizeof(char)*data.map_grid3Dparams.number_of_buckets);
+	throw_cuda_error(cudaMemcpy(data.device_occupancy_map, &(data.host_occupancy_map[0]), sizeof(char)*data.device_occupancy_map_size, cudaMemcpyHostToDevice), __FILE__, __LINE__);
+
+	data.particle_filter_state = ParticleFilterState::initial;
 
 #if 0
 
@@ -90,17 +98,12 @@ void initialize_host_device_data(HostDeviceData& data)
 
 
 
-	global_structures.device_occupied_map_size = global_structures.rgdParams_map.number_of_buckets;
-	global_structures.host_occupied_map.resize(global_structures.device_occupied_map_size);
 
-	cpuOccupied(global_structures.map,
-				global_structures.rgdParams_map,
-				global_structures.host_occupied_map);
 
-	cudaMalloc((void **)&global_structures.device_occupied_map, sizeof(char)*global_structures.rgdParams_map.number_of_buckets);
-	throw_cuda_error(cudaMemcpy(global_structures.device_occupied_map, &(global_structures.host_occupied_map[0]), sizeof(char)*global_structures.device_occupied_map_size, cudaMemcpyHostToDevice), __FILE__, __LINE__);
 
-	global_structures.particle_filter_state = ParticleFilterState::initial;
+
+
+
 
 	std::default_random_engine generator;
 	std::normal_distribution<double> dist_x(global_structures.mean_initial_guess_x, global_structures.std_initial_guess_x);
@@ -166,7 +169,35 @@ void initialize_host_device_data(HostDeviceData& data)
 
 	std::cout << "initialize_cuda_structures DONE" << std::endl;
 #endif
+}
+
+void compute_occupancy(std::vector<Point> &host_points,	Grid3DParams params, std::vector<char> &host_occupancy_map)
+{
+	for (size_t ind=0; ind < host_occupancy_map.size(); ++ind)
+	{
+		host_occupancy_map[ind] = PointType::not_initialised;
+	}
+
+	for(size_t index_of_point_source = 0 ; index_of_point_source < host_points.size(); index_of_point_source++){
+
+		Point &pSource = host_points[index_of_point_source];
+
+		if(pSource.x < params.bounding_box_min_X || pSource.x > params.bounding_box_max_X)continue;
+		if(pSource.y < params.bounding_box_min_Y || pSource.y > params.bounding_box_max_Y)continue;
+		if(pSource.z < params.bounding_box_min_Z || pSource.z > params.bounding_box_max_Z)continue;
 
 
+		long long unsigned int ix = (pSource.x - params.bounding_box_min_X) / params.resolution_X;
+		long long unsigned int iy = (pSource.y - params.bounding_box_min_Y) / params.resolution_Y;
+		long long unsigned int iz = (pSource.z - params.bounding_box_min_Z) / params.resolution_Z;
 
+
+		long long unsigned int index_bucket = ix* static_cast<long long unsigned int>(params.number_of_buckets_Y)*
+						static_cast<long long unsigned int>(params.number_of_buckets_Z) +
+						iy* static_cast<long long unsigned int>(params.number_of_buckets_Z) + iz;
+
+		if(index_bucket < host_occupancy_map.size()){
+			host_occupancy_map[index_bucket] = pSource.label;
+		}
+	}
 }
