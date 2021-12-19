@@ -88,7 +88,7 @@ struct HostDeviceData{
 	std::vector<Particle> particle_filter_initial_guesses;
 	std::vector<Particle> particles;
 
-	float initial_w;
+	//float initial_w;
 	float initial_w_exploration_particles;
 	int max_particles;
 

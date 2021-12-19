@@ -18,7 +18,7 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.map_grid3Dparams.resolution_X = 1.0;
 	data.map_grid3Dparams.resolution_Y = 1.0;
 	data.map_grid3Dparams.resolution_Z = 1000.0;
-	data.map_grid3Dparams.bounding_box_extension = 0;
+	data.map_grid3Dparams.bounding_box_extension = 1;
 
 	throw_cuda_error(cudaCalculateParams3D(
 			data.device_map,
@@ -35,17 +35,17 @@ void initialize_host_device_data(HostDeviceData& data)
 
 	data.particle_filter_state = ParticleFilterState::initial;
 
-	data.initial_w = -0.2;
-	data.initial_w_exploration_particles = -0.1;
+	//data.initial_w = -0.1;
+	data.initial_w_exploration_particles = -0.0000001;
 
-	data.max_particles = 30000;
-	data.min_dump_propability_no_observations = -1.0;
-	data.min_dump_propability_tracking = -0.1;
-	data.min_dump_propability = -10;
-	data.percent_particles_from_initial = 0.8;
+	data.max_particles = 100000;
+	data.min_dump_propability_no_observations = -1000000.0;
+	data.min_dump_propability_tracking = -10.0;
+	data.min_dump_propability = -10.0;
+	data.percent_particles_from_initial = 0.1;
 
-	data.number_of_replicated_best_particles_motion_model = 1000;
-	data.number_of_replicatations_motion_model = 10;
+	data.number_of_replicated_best_particles_motion_model = 100;
+	data.number_of_replicatations_motion_model = 100;
 
 	for(size_t i = 0 ; i < 10000000; i++){
 		Pose pose;
@@ -56,128 +56,22 @@ void initialize_host_device_data(HostDeviceData& data)
 		Particle p;
 		p.is_tracking = false;
 		p.pose = pose;
-		p.W = data.initial_w;
+		p.W = data.initial_w_exploration_particles;
 		p.nW = 0;
 
 		data.particle_filter_initial_guesses.push_back(p);
 	}
 
-	data.std_update.p.x = 0.01;
-	data.std_update.p.y = 0.01;
-	data.std_update.p.z = 0.01;
-	data.std_update.o.x_angle_rad = 0.001 * M_PI/180.0;
-	data.std_update.o.y_angle_rad = 0.001 * M_PI/180.0;
-	data.std_update.o.z_angle_rad = 0.001 * M_PI/180.0;
+	data.std_update.p.x = 0.1;
+	data.std_update.p.y = 0.02;
+	data.std_update.p.z = 0.0;
+	data.std_update.o.x_angle_rad = 0.0;
+	data.std_update.o.y_angle_rad = 0.0;
+	data.std_update.o.z_angle_rad = 2.0 * M_PI/180.0;
 
-	data.std_motion_model_x = 1;
-	data.std_motion_model_y = 0.05;
-	data.std_motion_model_z_angle_deg = 10.0;
-
-
-#if 0
-
-
-
-
-
-
-	global_structures.min_dump_propability = -10;//-0.1;
-	global_structures.min_dump_propability_tracking = -0.1;//-0.01;
-	global_structures.min_dump_propability_no_bservations = -1.0;
-
-
-	global_structures.initial_w_exploration_particles = -0.1;
-
-
-
-	global_structures.initial_w_cylinder_particles = -0.2;
-
-	global_structures.number_of_replicatations_cylinder = 10;
-	global_structures.number_of_replicated_best_particles_cylinder = 1000;
-
-	global_structures.std_cylinder_x = 2;
-	global_structures.std_cylinder_y = 2;
-	global_structures.std_cylinder_z = 5;
-	global_structures.std_cylinder_x_angle_deg = 2;
-	global_structures.std_cylinder_y_angle_deg = 2;
-	//global_structures.std_cylinder_z_angle_deg = 5;
-	global_structures.std_cylinder_z_angle_deg = 180;
-	global_structures.std_cylinder_angle_deg = 15;
-
-
-
-	global_structures.mean_initial_guess_x=0;
-	global_structures.mean_initial_guess_y=0;
-	global_structures.mean_initial_guess_z=30 - 100;
-	global_structures.std_initial_guess_x=3;
-	global_structures.std_initial_guess_y=3;
-	global_structures.std_initial_guess_z=30;
-	global_structures.mean_initial_guess_x_angle_deg=0;
-	global_structures.mean_initial_guess_y_angle_deg=0;
-	global_structures.mean_initial_guess_z_angle_deg=0;
-	global_structures.std_initial_guess_x_angle_deg=1;
-	global_structures.std_initial_guess_y_angle_deg=1;
-	global_structures.std_initial_guess_z_angle_deg=90;
-	global_structures.min_z=1 - 100;
-	global_structures.max_z=150 - 100;
-
-
-	global_structures.number_of_replicated_best_particles_motion_model = 1000;
-	global_structures.number_of_replicatations_motion_model = 10;
-
-	global_structures.std_autobus_x = 2;
-	global_structures.std_autobus_y = 2;
-	global_structures.std_autobus_z = 5;
-	global_structures.std_autobus_x_angle_deg = 2;
-	global_structures.std_autobus_y_angle_deg = 2;
-	global_structures.std_autobus_z_angle_deg = 5;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	std::default_random_engine generator;
-	std::normal_distribution<double> dist_x(global_structures.mean_initial_guess_x, global_structures.std_initial_guess_x);
-	std::normal_distribution<double> dist_y(global_structures.mean_initial_guess_y, global_structures.std_initial_guess_y);
-    Generator dist_z(global_structures.mean_initial_guess_z, global_structures.std_initial_guess_z,global_structures.min_z,global_structures.max_z);
-	std::normal_distribution<double> dist_x_angle(global_structures.mean_initial_guess_x_angle_deg, global_structures.std_initial_guess_x_angle_deg);
-	std::normal_distribution<double> dist_y_angle(global_structures.mean_initial_guess_y_angle_deg, global_structures.std_initial_guess_y_angle_deg);
-	std::normal_distribution<double> dist_z_angle(global_structures.mean_initial_guess_z_angle_deg, global_structures.std_initial_guess_z_angle_deg);
-
-	// for(size_t i = 0 ; i < 10000000; i++){
-	// 	Particle particle;
-	// 	particle.W = 1;
-	// 	particle.nW = 0;
-	// 	particle.overlap = 0;
-	// 	particle.pose.p.x = dist_x(generator);
-	// 	particle.pose.p.y = dist_y(generator);
-	// 	particle.pose.p.z = dist_z();
-
-	// 	particle.pose.o.x_angle_rad = dist_x_angle(generator);
-	// 	particle.pose.o.y_angle_rad = dist_y_angle(generator);
-	// 	particle.pose.o.z_angle_rad = dist_z_angle(generator);
-	// 	printf("%lf,%lf,%lf,%lf,%lf,%lf\n",particle.pose.p.x,particle.pose.p.y,particle.pose.p.z,particle.pose.o.x_angle_rad,particle.pose.o.y_angle_rad,particle.pose.o.z_angle_rad);
-
-	// 	global_structures.particle_filter_initial_guesses.push_back(particle);
-	// }
-
-
-
-
-
-
-
-	std::cout << "initialize_cuda_structures DONE" << std::endl;
-#endif
+	data.std_motion_model_x = 0.5;
+	data.std_motion_model_y = 0.1;
+	data.std_motion_model_z_angle_deg = 1.0;
 }
 
 void compute_occupancy(std::vector<Point> &host_points,	Grid3DParams params, std::vector<char> &host_occupancy_map)
@@ -318,17 +212,32 @@ void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::ve
 	if(data.particle_filter_state == ParticleFilterState::initial){
 		initial_step(data);
 	}else if(data.particle_filter_state == ParticleFilterState::normal){
+
+		/*if(data.particles.size() < 1000){
+			std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
+			data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
+		}
+		if(data.particles.size() > 0){
+			if(data.particles[0].W < -1.0){
+				std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
+				data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
+			}
+		}*/
+
+		std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
+		data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
+
 		update_poses(data, pose_update);
 		compute_overlaps(data, points_local);
 		normalize_W(data);
 		update_propability(data);
 		resample(data);
 
-		std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
-		std::vector<Particle> motion_model_particles = get_motion_model_particles(data);
+		//std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
+		//std::vector<Particle> motion_model_particles = get_motion_model_particles(data);
 
-		data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
-		data.particles.insert(data.particles.end(), motion_model_particles.begin(), motion_model_particles.end());
+		//data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
+		//data.particles.insert(data.particles.end(), motion_model_particles.begin(), motion_model_particles.end());
 	}
 
 	auto end = std::chrono::steady_clock::now();
@@ -341,12 +250,19 @@ void update_poses(HostDeviceData& data, const Pose& pose_update)
 	if(data.particles.size() == 0)return;
 
 	std::default_random_engine generator;
-	std::normal_distribution<double> dist_x(-data.std_update.p.x, data.std_update.p.x);
+	/*std::normal_distribution<double> dist_x(-data.std_update.p.x, data.std_update.p.x);
 	std::normal_distribution<double> dist_y(-data.std_update.p.y, data.std_update.p.y);
 	std::normal_distribution<double> dist_z(-data.std_update.p.z, data.std_update.p.z);
 	std::normal_distribution<double> dist_x_angle(-data.std_update.o.x_angle_rad, data.std_update.o.x_angle_rad);
 	std::normal_distribution<double> dist_y_angle(-data.std_update.o.y_angle_rad, data.std_update.o.y_angle_rad);
-	std::normal_distribution<double> dist_z_angle(-data.std_update.o.z_angle_rad, data.std_update.o.z_angle_rad);
+	std::normal_distribution<double> dist_z_angle(-data.std_update.o.z_angle_rad, data.std_update.o.z_angle_rad);*/
+
+	std::normal_distribution<double> dist_x(0, data.std_update.p.x);
+	std::normal_distribution<double> dist_y(0, data.std_update.p.y);
+	std::normal_distribution<double> dist_z(0, data.std_update.p.z);
+	std::normal_distribution<double> dist_x_angle(0, data.std_update.o.x_angle_rad);
+	std::normal_distribution<double> dist_y_angle(0, data.std_update.o.y_angle_rad);
+	std::normal_distribution<double> dist_z_angle(0, data.std_update.o.z_angle_rad);
 
 	for(size_t i = 0 ; i < data.particles.size(); i++){
 		Pose pose_update_with_noise = pose_update;
@@ -356,6 +272,12 @@ void update_poses(HostDeviceData& data, const Pose& pose_update)
 		//pose_update_with_noise.o.x_angle_rad += dist_x_angle(generator);
 		//pose_update_with_noise.o.y_angle_rad += dist_y_angle(generator);
 		pose_update_with_noise.o.z_angle_rad += dist_z_angle(generator);
+
+		//Pose p_increment;
+		//p_increment.p.x = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_update.p.x;
+		//p_increment.p.y = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_update.p.y;
+		//p_increment.o.z_angle_rad = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * data.std_update.o.z_angle_rad);
+
 
 		data.particles[i].pose = get_pose ( get_matrix(data.particles[i].pose) *  get_matrix(pose_update_with_noise) );
 	}
@@ -372,7 +294,7 @@ void compute_overlaps(HostDeviceData& data, std::vector<Point>& points)
 	cudaMemcpy(device_particles, data.particles.data(), sizeof(Particle)*data.particles.size(), cudaMemcpyHostToDevice);
 
 	throw_cuda_error(cudaCountOverlaps (
-			512,
+			128,
 			device_points,
 			points.size(),
 			data.device_occupancy_map,
@@ -424,9 +346,10 @@ void update_propability(HostDeviceData& data)
 	if(data.particles.size() == 0)return;
 
 	for(size_t i = 0 ; i < data.particles.size(); i++){
-		double dump = data.min_dump_propability_no_observations;
+		/*double dump = data.min_dump_propability_no_observations;
 
 		if(data.particles[i].overlap > 0.0){
+			//std::cout << "jojoj" << std::endl;
 			dump = std::log(data.particles[i].overlap);
 
 
@@ -442,8 +365,36 @@ void update_propability(HostDeviceData& data)
 		}
 
 		data.particles[i].W += dump;
-		data.particles[i].is_tracking = false;
+		data.particles[i].is_tracking = false;*/
+
+		if(data.particles[i].overlap > 0.0){
+			//std::cout << "d: " << data.particles[i].overlap << std::endl;
+
+			double dump = std::log(data.particles[i].overlap);
+
+			//std::cout << "dump: " << dump << std::endl;
+			data.particles[i].W += dump;
+			data.particles[i].is_tracking = false;
+		}else{
+			data.particles[i].W += -1000000;
+			data.particles[i].is_tracking = false;
+		}
 	}
+
+
+	//here
+	double max_w = -10000000000;
+	for(size_t i = 0 ; i < data.particles.size(); i++){
+		if(data.particles[i].W > max_w){
+			max_w = data.particles[i].W;
+		}
+	}
+
+	for(size_t i = 0 ; i < data.particles.size(); i++){
+		data.particles[i].W -= max_w;
+	}
+
+
 }
 
 inline bool compareParticle_nW(const Particle& a, const Particle& b)
@@ -543,16 +494,18 @@ std::vector<Particle> get_motion_model_particles(HostDeviceData& data)
 	if(data.particles.size() > data.number_of_replicated_best_particles_motion_model){
 		for(size_t i = 0; i < data.number_of_replicated_best_particles_motion_model; i++){
 			for(size_t j = 0 ; j < data.number_of_replicatations_motion_model; j++){
+				Pose p_increment;
+				p_increment.p.x = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_x;
+				p_increment.p.y = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_y;
+				p_increment.o.z_angle_rad = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * data.std_motion_model_z_angle_deg);
+
 				Particle p;
 				p.is_tracking = true;
-				p.pose = data.particles[i].pose;
+				p.pose = get_pose(get_matrix(data.particles[i].pose) * get_matrix(p_increment));
 				p.W = data.particles[i].W;
 				p.nW = data.particles[i].nW;
-
-				p.pose.p.x += ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_x;
-				p.pose.p.y += ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_y;
-				p.pose.o.z_angle_rad +=  ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * data.std_motion_model_z_angle_deg);
-
+				//p.W = -0.001;
+				//p.nW = 0;
 				particles.push_back(p);
 			}
 		}

@@ -123,7 +123,7 @@ __global__ void  kernel_cudaCountOverlaps (
 		double cy = cos(pose.o.y_angle_rad);
 		double sz = sin(pose.o.z_angle_rad);
 		double cz = cos(pose.o.z_angle_rad);
-		float sum_good_hits = 0;
+		float sum_good_hits = 0.0f;
 
 		for(size_t i = 0 ; i < points_size; i++){
 			Point pSourceLocal = device_points[i];
@@ -146,9 +146,9 @@ __global__ void  kernel_cudaCountOverlaps (
 
 			if (index_bucket >= 0 && index_bucket < params.number_of_buckets){
 				if(occupied[index_bucket] == pSourceLocal.label){
-					if(pSourceLocal.label == PointType::obstacle){
+					//if(pSourceLocal.label == PointType::obstacle){
 						sum_good_hits ++;
-					}
+					//}
 				}
 			}
 		}

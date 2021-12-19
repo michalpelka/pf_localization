@@ -52,7 +52,6 @@ int gl_main(int argc, char *argv[]){
 }
 
 void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
-
     Eigen::Affine3f transform(Eigen::Affine3f::Identity());
     transform.translation().x() = 0.2;
     transform.rotate(Eigen::Quaternionf(0.96593,0,0,-0.25882));
@@ -62,8 +61,18 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
     filter.setLeafSize(0.25,0.25,0.25);
     filter.filter(filtered);
     std::lock_guard<std::mutex> lck(mtx_input_data);
-    pcl::transformPointCloud(filtered, input_data, transform);
+
+    pcl::PointCloud<pcl::PointXYZI> filtered_cut_z;
+    filtered_cut_z.reserve(filtered.size());
+    for(const auto &ref:filtered){
+    	if(fabs(ref.z)< 0.3){
+    		filtered_cut_z.push_back(ref);
+    	}
+    }
+
+    pcl::transformPointCloud(filtered_cut_z, input_data, transform);
 }
+
 void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
 {
     Eigen::Affine3d transform(Eigen::Affine3d::Identity());
@@ -78,11 +87,13 @@ int main (int argc, char *argv[])
 {
 	//ToDo data.host_map -> load map from file
 	pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-	pcl::io::loadPCDFile("/media/michal/ext/p7p2_2d_clean.pcd", *map_cloud);
+	pcl::io::loadPCDFile("/home/janusz/DATA/Lustra-mid-70/p7p2_2d_clean.pcd", *map_cloud);
 
     host_device_data.host_map.resize(map_cloud->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
-                   [](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
+                   //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
+    		[](const pcl::PointXYZI&p){return Point{p.x,p.y,0, PointType::obstacle };});
+
 
 	initialize_host_device_data(host_device_data);
 
@@ -109,8 +120,9 @@ void display() {
         last_odometry = odometry;
         points.resize(input_data.size());
         std::transform(input_data.begin(),input_data.end(), points.begin(),
-                       [](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
+                       [](const pcl::PointXYZI&p){return Point{p.x,p.y,0, PointType::obstacle };});
         pose_update = get_pose(odometry_increment);
+
     }
     std::cout << pose_update.p.x <<"\t" << pose_update.p.y <<"\t" << pose_update.o.z_angle_rad << std::endl;
 	particle_filter_step(host_device_data, pose_update, points);
@@ -119,6 +131,8 @@ void display() {
 		std::cout << "best pose" << std::endl;
         best_pose = get_matrix(host_device_data.particles[0].pose);
 		std::cout << best_pose.matrix() << std::endl;
+
+		std::cout << "w: " <<host_device_data.particles[0].W << " " << host_device_data.particles[0].nW << std::endl;
 	}
 
 
@@ -154,6 +168,8 @@ void display() {
         glEnd();
     }
 
+    glPointSize(10);
+    glColor3f(0.6, 1, 0.1);
     glBegin(GL_POINTS);
     for (int i=0; i< points.size();i++)
     {
@@ -163,7 +179,7 @@ void display() {
         glVertex3f(ppt.x(), ppt.y(), ppt.z());
     }
     glEnd();
-
+    glPointSize(1);
 
     glColor3f(0.7,0.7,0.7);
     glBegin(GL_POINTS);
@@ -191,6 +207,11 @@ void display() {
     ImGui::Checkbox("co_draw", &imgui_draw_co);
     if(ImGui::Button("foo"))
     {
+    	std::vector<Particle> exploration_particles = choose_random_exploration_particles(host_device_data);
+
+    	host_device_data.particles.insert(host_device_data.particles.end(), exploration_particles.begin(), exploration_particles.end());
+
+
         std::cout << "bar\n";
     }
 

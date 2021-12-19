@@ -1,0 +1,4 @@
+roscore
+rosrun localization_gl localization_gl_node 
+rosbag play ...
+
