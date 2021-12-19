@@ -11,6 +11,11 @@ struct Point{
 	char label;
 };
 
+enum PointType{
+	not_initialised,
+	obstacle
+};
+
 struct Grid3DParams{
 	float bounding_box_min_X;
 	float bounding_box_min_Y;
@@ -28,15 +33,27 @@ struct Grid3DParams{
 	float resolution_Z;
 };
 
+enum ParticleFilterState{
+	initial,
+	normal
+};
+
 struct HostDeviceData{
 	std::vector<Point> host_map;
 	Point *device_map;
 	size_t device_map_size;
 
+	std::vector<char> host_occupancy_map;
+	char *device_occupancy_map;
+	size_t device_occupancy_map_size;
+
 	Grid3DParams map_grid3Dparams;
+
+	char particle_filter_state;
 
 	~HostDeviceData(){
 		cudaFree(device_map);
+		cudaFree(device_occupancy_map);
 	}
 };
 
