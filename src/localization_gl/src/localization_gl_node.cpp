@@ -9,7 +9,7 @@
 #include "imgui.h"
 #include "imgui_impl_glut.h"
 #include "imgui_impl_opengl2.h"
-
+#include <pcl/filters/approximate_voxel_grid.h>
 #include <pcl/common/transforms.h>
 #include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
@@ -29,6 +29,8 @@ int windows_handle = -1;
 std::mutex mtx_input_data;
 pcl::PointCloud<pcl::PointXYZI> input_data;
 Eigen::Affine3d odometry {Eigen::Affine3d::Identity()};
+Eigen::Affine3d last_odometry {Eigen::Affine3d::Identity()};
+
 Eigen::Affine3d odometry_increment{Eigen::Affine3d::Identity()};
 HostDeviceData host_device_data;
 
@@ -49,24 +51,26 @@ int gl_main(int argc, char *argv[]){
     glutMainLoop();
 }
 
-void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>&  msg){
-    std::lock_guard<std::mutex> lck(mtx_input_data);
+void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
+
     Eigen::Affine3f transform(Eigen::Affine3f::Identity());
     transform.translation().x() = 0.2;
     transform.rotate(Eigen::Quaternionf(0.96593,0,0,-0.25882));
-    pcl::transformPointCloud(msg, input_data, transform);
+    pcl::ApproximateVoxelGrid<pcl::PointXYZI> filter;
+    filter.setInputCloud(msg);
+    pcl::PointCloud<pcl::PointXYZI> filtered;
+    filter.setLeafSize(0.25,0.25,0.25);
+    filter.filter(filtered);
+    std::lock_guard<std::mutex> lck(mtx_input_data);
+    pcl::transformPointCloud(filtered, input_data, transform);
 }
 void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
 {
     Eigen::Affine3d transform(Eigen::Affine3d::Identity());
+    std::lock_guard<std::mutex> lck(mtx_input_data);
     transform.translation() = Eigen::Vector3d{odo->pose.pose.position.x,odo->pose.pose.position.y,odo->pose.pose.position.z};
     transform.rotate(Eigen::Quaterniond{odo->pose.pose.orientation.w,odo->pose.pose.orientation.x,
                                         odo->pose.pose.orientation.y,odo->pose.pose.orientation.z});
-
-    odometry_increment = transform * odometry.inverse();
-    odometry = transform;
-    std::cout << "============" << std::endl;
-    std::cout << odometry_increment.matrix() << std::endl;
 }
 int main (int argc, char *argv[])
 {
@@ -96,6 +100,16 @@ void display() {
     if (!ros::ok()){
         return;
     }
+    std::vector<Point> points;
+    Pose pose_update;
+    {
+        std::lock_guard<std::mutex> lck(mtx_input_data);
+        odometry_increment = odometry * last_odometry.inverse();
+        last_odometry = odometry;
+        points.resize(input_data.size());
+        std::transform(input_data.begin(),input_data.end(), points.begin(),
+                       [](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
+    }
 
     ImGuiIO& io = ImGui::GetIO();
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
@@ -122,16 +136,15 @@ void display() {
         glVertex3f(0.0f, 0.0f, imgui_co_size);
         glEnd();
     }
+
+    glBegin(GL_POINTS);
+    for (int i=0; i< points.size();i++)
     {
-        std::lock_guard<std::mutex> lck(mtx_input_data);
-        glBegin(GL_POINTS);
-        for (int i=0; i< input_data.size();i++)
-        {
-            const auto &p = input_data[i];
-            glVertex3f(p.x, p.y,p.z);
-        }
-        glEnd();
+        const auto &p = points[i];
+        glVertex3f(p.x, p.y,p.z);
     }
+    glEnd();
+
 
     glColor3f(0.7,0.7,0.7);
     glBegin(GL_POINTS);
