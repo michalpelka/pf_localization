@@ -38,12 +38,14 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.initial_w = -0.2;
 	data.initial_w_exploration_particles = -0.1;
 
-	data.max_particles = 10000;
+	data.max_particles = 30000;
 	data.min_dump_propability_no_observations = -1.0;
 	data.min_dump_propability_tracking = -0.1;
 	data.min_dump_propability = -10;
 	data.percent_particles_from_initial = 0.8;
 
+	data.number_of_replicated_best_particles_motion_model = 1000;
+	data.number_of_replicatations_motion_model = 10;
 
 	for(size_t i = 0 ; i < 10000000; i++){
 		Pose pose;
@@ -66,6 +68,11 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.std_update.o.x_angle_rad = 0.001 * M_PI/180.0;
 	data.std_update.o.y_angle_rad = 0.001 * M_PI/180.0;
 	data.std_update.o.z_angle_rad = 0.001 * M_PI/180.0;
+
+	data.std_motion_model_x = 1;
+	data.std_motion_model_y = 0.05;
+	data.std_motion_model_z_angle_deg = 10.0;
+
 
 #if 0
 
@@ -318,15 +325,10 @@ void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::ve
 		resample(data);
 
 		std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
-		//motion mode autobus
+		std::vector<Particle> motion_model_particles = get_motion_model_particles(data);
+
 		data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
-
-
-
-		//for(size_t i = 0 ; i < data.particles.size(); i++){
-		//	std::cout << data.particles[i].overlap << " ";
-		//}
-
+		data.particles.insert(data.particles.end(), motion_model_particles.begin(), motion_model_particles.end());
 	}
 
 	auto end = std::chrono::steady_clock::now();
@@ -532,4 +534,28 @@ std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data)
 		exploration_particles.push_back(p);
 	}
 	return exploration_particles;
+}
+
+std::vector<Particle> get_motion_model_particles(HostDeviceData& data)
+{
+	std::vector<Particle> particles;
+
+	if(data.particles.size() > data.number_of_replicated_best_particles_motion_model){
+		for(size_t i = 0; i < data.number_of_replicated_best_particles_motion_model; i++){
+			for(size_t j = 0 ; j < data.number_of_replicatations_motion_model; j++){
+				Particle p;
+				p.is_tracking = true;
+				p.pose = data.particles[i].pose;
+				p.W = data.particles[i].W;
+				p.nW = data.particles[i].nW;
+
+				p.pose.p.x += ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_x;
+				p.pose.p.y += ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_y;
+				p.pose.o.z_angle_rad +=  ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * data.std_motion_model_z_angle_deg);
+
+				particles.push_back(p);
+			}
+		}
+	}
+	return particles;
 }

@@ -167,10 +167,10 @@ void display() {
 
     glColor3f(0.7,0.7,0.7);
     glBegin(GL_POINTS);
-    for(size_t i = 0 ; i < host_device_data.particle_filter_initial_guesses.size(); i++){
-    	glVertex3f(host_device_data.particle_filter_initial_guesses[i].pose.p.x,
-    			host_device_data.particle_filter_initial_guesses[i].pose.p.y,
-    			host_device_data.particle_filter_initial_guesses[i].pose.p.z);
+    for(size_t i = 0 ; i < host_device_data.particles.size(); i++){
+    	glVertex3f(host_device_data.particles[i].pose.p.x,
+    			host_device_data.particles[i].pose.p.y,
+    			host_device_data.particles[i].pose.p.z);
     }
     glEnd();
 

@@ -17,5 +17,7 @@ void normalize_W(HostDeviceData& data);
 void update_propability(HostDeviceData& data);
 void resample(HostDeviceData& data);
 std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data);
+std::vector<Particle> get_motion_model_particles(HostDeviceData& data);
+
 
 #endif

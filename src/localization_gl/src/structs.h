@@ -99,6 +99,13 @@ struct HostDeviceData{
 	float min_dump_propability;
 
 	float percent_particles_from_initial;
+	int number_of_replicated_best_particles_motion_model;
+	int number_of_replicatations_motion_model;
+
+	float std_motion_model_x;
+	float std_motion_model_y;
+	float std_motion_model_z_angle_deg;
+
 
 	~HostDeviceData(){
 		cudaFree(device_map);
