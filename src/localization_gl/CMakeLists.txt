@@ -166,7 +166,7 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 #add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src})
 
-cuda_add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src})
+cuda_add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src} src/pf.cpp)
 
 
 ## Rename C++ executable without prefix
