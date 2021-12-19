@@ -101,3 +101,81 @@ cudaError_t cudaCalculateParams3D(
 			}
 	return cudaGetLastError();
 }
+
+__global__ void  kernel_cudaCountOverlaps (
+		Point *device_points,
+		size_t points_size,
+		char* occupied,
+		size_t occupied_size,
+		Grid3DParams params,
+		Particle *device_particles,
+		size_t device_particles_size)
+{
+	size_t index_of_particle = blockIdx.x*blockDim.x + threadIdx.x;
+
+	if (index_of_particle < device_particles_size){
+		device_particles[index_of_particle].status = ParticleStatus::to_alive;
+		device_particles[index_of_particle].overlap = 0;
+		Pose pose = device_particles[index_of_particle].pose;
+		double sx = sin(pose.o.x_angle_rad);
+		double cx = cos(pose.o.x_angle_rad);
+		double sy = sin(pose.o.y_angle_rad);
+		double cy = cos(pose.o.y_angle_rad);
+		double sz = sin(pose.o.z_angle_rad);
+		double cz = cos(pose.o.z_angle_rad);
+		float sum_good_hits = 0;
+
+		for(size_t i = 0 ; i < points_size; i++){
+			Point pSourceLocal = device_points[i];
+			Point pSourceGlobal = pSourceLocal;
+			pSourceGlobal.x = (cy * cz) * pSourceLocal.x + (-cy * sz) * pSourceLocal.y + (sy) * pSourceLocal.z + pose.p.x;
+			pSourceGlobal.y = (cz * sx * sy + cx * sz) * pSourceLocal.x + (cx * cz - sx * sy * sz) * pSourceLocal.y + (-cy * sx) * pSourceLocal.z + pose.p.y;
+			pSourceGlobal.z = (-cx * cz * sy + sx * sz) * pSourceLocal.x + (cz * sx + cx * sy * sz) * pSourceLocal.y + (cx * cy) * pSourceLocal.z + pose.p.z;
+
+
+			if(pSourceGlobal.x < params.bounding_box_min_X || pSourceGlobal.x > params.bounding_box_max_X)continue;
+			if(pSourceGlobal.y < params.bounding_box_min_Y || pSourceGlobal.y > params.bounding_box_max_Y)continue;
+			if(pSourceGlobal.z < params.bounding_box_min_Z || pSourceGlobal.z > params.bounding_box_max_Z)continue;
+
+			long long unsigned int ix = (pSourceGlobal.x - params.bounding_box_min_X) / params.resolution_X;
+			long long unsigned int iy = (pSourceGlobal.y - params.bounding_box_min_Y) / params.resolution_Y;
+			long long unsigned int iz = (pSourceGlobal.z - params.bounding_box_min_Z) / params.resolution_Z;
+
+			long long unsigned int index_bucket = ix* static_cast<long long unsigned int>(params.number_of_buckets_Y) *
+						static_cast<long long unsigned int>(params.number_of_buckets_Z) + iy * static_cast<long long unsigned int>( params.number_of_buckets_Z) + iz;
+
+			if (index_bucket >= 0 && index_bucket < params.number_of_buckets){
+				if(occupied[index_bucket] == pSourceLocal.label){
+					if(pSourceLocal.label == PointType::obstacle){
+						sum_good_hits ++;
+					}
+				}
+			}
+		}
+		device_particles[index_of_particle].overlap = sum_good_hits;
+	}
+}
+
+cudaError_t cudaCountOverlaps (
+		int threads,
+		Point *device_points,
+		size_t points_size,
+		char* occupied,
+		size_t occupied_size,
+		Grid3DParams params,
+		Particle *device_particles,
+		size_t device_particles_size)
+{
+	int blocks = device_particles_size / threads + 1;
+
+		kernel_cudaCountOverlaps<<< blocks, threads>>> (
+				device_points,
+				points_size,
+				occupied,
+				occupied_size,
+				params,
+				device_particles,
+				device_particles_size);
+
+	return cudaGetLastError();
+}

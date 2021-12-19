@@ -1,7 +1,12 @@
 #include <chrono>
+#include <random>
 
 #include "pf.h"
 #include "rgd.cuh"
+
+
+std::default_random_engine gen_initial_guesses;
+
 
 void initialize_host_device_data(HostDeviceData& data)
 {
@@ -30,6 +35,7 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.particle_filter_state = ParticleFilterState::initial;
 
 	data.initial_w = -0.2;
+	data.max_particles = 10000;
 
 	for(size_t i = 0 ; i < 10000000; i++){
 		Pose pose;
@@ -46,15 +52,17 @@ void initialize_host_device_data(HostDeviceData& data)
 		data.particle_filter_initial_guesses.push_back(p);
 	}
 
+	data.std_update.p.x = 0.01;
+	data.std_update.p.y = 0.01;
+	data.std_update.p.z = 0.01;
+	data.std_update.o.x_angle_rad = 0.001 * M_PI/180.0;
+	data.std_update.o.y_angle_rad = 0.001 * M_PI/180.0;;
+	data.std_update.o.z_angle_rad = 0.001 * M_PI/180.0;;
+
 #if 0
 
 
-	global_structures.std_update.p.x = 0.05;
-	global_structures.std_update.p.y = 0.05;
-	global_structures.std_update.p.z = 0.05;
-	global_structures.std_update.o.x_angle_rad = 0.005 * M_PI/180.0;
-	global_structures.std_update.o.y_angle_rad = 0.005 * M_PI/180.0;;
-	global_structures.std_update.o.z_angle_rad = 0.005 * M_PI/180.0;;
+
 
 	global_structures.percent_particles_from_initial=0.9;
 	global_structures.max_particles=30000;
@@ -271,10 +279,10 @@ Eigen::Affine3d get_matrix(Pose _p)
 }
 
 void initial_step(HostDeviceData& data){
-	/*global_structures.particles.clear();
+	data.particles.clear();
 
-	std::uniform_int_distribution<> random_index(0, global_structures.particle_filter_initial_guesses.size());
-	for (size_t i = 0; i < global_structures.max_particles; i++)
+	std::uniform_int_distribution<> random_index(0, data.particle_filter_initial_guesses.size());
+	for (size_t i = 0; i < data.max_particles; i++)
 	{
 		int index = random_index(gen_initial_guesses);
 
@@ -283,24 +291,81 @@ void initial_step(HostDeviceData& data){
 		p.W = 0;
 		p.nW = 0;
 		p.overlap = 0;
-		p.pose = global_structures.particle_filter_initial_guesses[index].pose;
-		global_structures.particles.push_back(p);
+		p.pose = data.particle_filter_initial_guesses[index].pose;
+		data.particles.push_back(p);
 	}
-	global_structures.particle_filter_state = ParticleFilterState::normal;
-	std::cout << "initial_step global_structures.particles.size(): " << global_structures.particles.size() << std::endl;
-*/}
+	data.particle_filter_state = ParticleFilterState::normal;
+	std::cout << "initial_step global_structures.particles.size(): " << data.particles.size() << std::endl;
+}
 
 void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::vector<Point> points_local)
 {
 	auto start = std::chrono::steady_clock::now();
 
 	if(data.particle_filter_state == ParticleFilterState::initial){
-		//initial_step(global_structures);
+		initial_step(data);
 	}else if(data.particle_filter_state == ParticleFilterState::normal){
+		update_poses(data, pose_update);
+		compute_overlaps(data, points_local);
+
+		for(size_t i = 0 ; i < data.particles.size(); i++){
+			std::cout << data.particles[i].overlap << " ";
+		}
 
 	}
 
 	auto end = std::chrono::steady_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end-start;
 	printf("time: %-10f\n",elapsed_seconds.count());
+}
+
+void update_poses(HostDeviceData& data, const Pose& pose_update)
+{
+	if(data.particles.size() == 0)return;
+
+	std::default_random_engine generator;
+	std::normal_distribution<double> dist_x(-data.std_update.p.x, data.std_update.p.x);
+	std::normal_distribution<double> dist_y(-data.std_update.p.y, data.std_update.p.y);
+	std::normal_distribution<double> dist_z(-data.std_update.p.z, data.std_update.p.z);
+	std::normal_distribution<double> dist_x_angle(-data.std_update.o.x_angle_rad, data.std_update.o.x_angle_rad);
+	std::normal_distribution<double> dist_y_angle(-data.std_update.o.y_angle_rad, data.std_update.o.y_angle_rad);
+	std::normal_distribution<double> dist_z_angle(-data.std_update.o.z_angle_rad, data.std_update.o.z_angle_rad);
+
+	for(size_t i = 0 ; i < data.particles.size(); i++){
+		Pose pose_update_with_noise = pose_update;
+		pose_update_with_noise.p.x += dist_x(generator);
+		pose_update_with_noise.p.y += dist_y(generator);
+		//pose_update_with_noise.p.z += dist_z(generator);
+		//pose_update_with_noise.o.x_angle_rad += dist_x_angle(generator);
+		//pose_update_with_noise.o.y_angle_rad += dist_y_angle(generator);
+		pose_update_with_noise.o.z_angle_rad += dist_z_angle(generator);
+
+		data.particles[i].pose = get_pose ( get_matrix(data.particles[i].pose) *  get_matrix(pose_update_with_noise) );
+	}
+}
+
+void compute_overlaps(HostDeviceData& data, std::vector<Point>& points)
+{
+	Point *device_points;
+	cudaMalloc((void **)&device_points, sizeof(Point)*points.size());
+	cudaMemcpy(device_points, points.data(), sizeof(Point)*points.size(), cudaMemcpyHostToDevice);
+
+	Particle *device_particles;
+	cudaMalloc((void **)&device_particles, sizeof(Particle)*data.particles.size());
+	cudaMemcpy(device_particles, data.particles.data(), sizeof(Particle)*data.particles.size(), cudaMemcpyHostToDevice);
+
+	throw_cuda_error(cudaCountOverlaps (
+			512,
+			device_points,
+			points.size(),
+			data.device_occupancy_map,
+			data.device_occupancy_map_size,
+			data.map_grid3Dparams,
+			device_particles,
+			data.particles.size()), __FILE__, __LINE__);
+
+	throw_cuda_error(cudaMemcpy(&(data.particles[0]), device_particles, sizeof(Particle) * data.particles.size(), cudaMemcpyDeviceToHost), __FILE__, __LINE__);
+
+	cudaFree(device_points);
+	cudaFree(device_particles);
 }

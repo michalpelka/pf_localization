@@ -10,5 +10,7 @@ Pose get_pose(Eigen::Affine3d m);
 Eigen::Affine3d get_matrix(Pose _p);
 void initial_step(HostDeviceData& data);
 void particle_filter_step(HostDeviceData& global_structures, const Pose& pose_update, std::vector<Point> points_local);
+void update_poses(HostDeviceData& data, const Pose& pose_update);
+void compute_overlaps(HostDeviceData& data, std::vector<Point>& points);
 
 #endif
