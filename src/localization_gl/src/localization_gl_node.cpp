@@ -71,8 +71,16 @@ void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
 int main (int argc, char *argv[])
 {
 	//ToDo data.host_map -> load map from file
+	pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+	pcl::io::loadPCDFile("/media/michal/ext/p7p2_2d_clean.pcd", *map_cloud);
+
+    host_device_data.host_map.resize(map_cloud->size());
+    std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
+                   [](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z};});
+
 	initialize_host_device_data(host_device_data);
 
+    map_cloud = nullptr;
     ros::init(argc, argv, "localization_gl");
     ros::NodeHandle n;
     ros::Subscriber sub = n.subscribe("/velodyne_points", 1, pointcloud_callback);
@@ -124,9 +132,13 @@ void display() {
         }
         glEnd();
     }
-
+    glBegin(GL_POINTS);
+    glColor3f(1.0f, 1.0f, 1.0f);
     //ToDo data -> render map from file
-
+    for (const auto &p : host_device_data.host_map)
+    {
+        glVertex3f(p.x, p.y,p.z);
+    } glEnd();
     ///////////////////////
 
     ImGui_ImplOpenGL2_NewFrame();
