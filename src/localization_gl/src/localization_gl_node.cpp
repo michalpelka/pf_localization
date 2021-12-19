@@ -132,8 +132,18 @@ void display() {
         }
         glEnd();
     }
+
+    glColor3f(0.7,0.7,0.7);
     glBegin(GL_POINTS);
-    glColor3f(1.0f, 1.0f, 1.0f);
+    for(size_t i = 0 ; i < host_device_data.particle_filter_initial_guesses.size(); i++){
+    	glVertex3f(host_device_data.particle_filter_initial_guesses[i].pose.p.x,
+    			host_device_data.particle_filter_initial_guesses[i].pose.p.y,
+    			host_device_data.particle_filter_initial_guesses[i].pose.p.z);
+    }
+    glEnd();
+
+    glBegin(GL_POINTS);
+    glColor3f(1.0f, 1.0f, 0.0f);
     //ToDo data -> render map from file
     for (const auto &p : host_device_data.host_map)
     {
