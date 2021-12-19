@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "pf.h"
 #include "rgd.cuh"
 
@@ -186,4 +188,119 @@ void compute_occupancy(std::vector<Point> &host_points,	Grid3DParams params, std
 			host_occupancy_map[index_bucket] = pSource.label;
 		}
 	}
+}
+
+Pose get_pose(Eigen::Affine3d _m)
+{
+    Pose pose;
+    /*Eigen::Vector3d ea = _m.rotation().eulerAngles(0, 1, 2);
+
+    pose.o.x_angle_rad = ea.x();
+    pose.o.y_angle_rad = ea.y();
+    pose.o.z_angle_rad = ea.z();
+    pose.p.x = _m.translation().x();
+    pose.p.y = _m.translation().y();
+    pose.p.z = _m.translation().z();*/
+
+    pose.p.x = _m(0,3);
+    pose.p.y = _m(1,3);
+    pose.p.z = _m(2,3);
+
+    if (_m(0,2) < 1) {
+        if (_m(0,2) > -1) {
+            pose.o.y_angle_rad = asin(_m(0,2));
+            pose.o.x_angle_rad = atan2(-_m(1,2), _m(2,2));
+            pose.o.z_angle_rad = atan2(-_m(0,1), _m(0,0));
+
+            //double C = cos(out_p.o.roll_y_rad);
+            //out_p.o.pitch_x_rad = atan2(-in_m[r_12]/C, in_m[r_22]/C);
+            //out_p.o.yaw_z_rad = atan2(-in_m[r_01]/C, in_m[r_00]/C);
+
+        }
+        else //r02 = −1
+        {
+            // not a unique solution: thetaz − thetax = atan2 ( r10 , r11 )
+            pose.o.y_angle_rad = -M_PI / 2.0;
+            pose.o.x_angle_rad = -atan2(_m(1,0), _m(1,1));
+            pose.o.z_angle_rad = 0;
+            return pose;
+        }
+    }
+    else {
+        // r02 = +1
+        // not a unique solution: thetaz + thetax = atan2 ( r10 , r11 )
+        pose.o.y_angle_rad = M_PI / 2.0;
+        pose.o.x_angle_rad = atan2(_m(1,0), _m(1,1));
+        pose.o.z_angle_rad = 0.0;
+        return pose;
+    }
+
+
+    return pose;
+}
+
+Eigen::Affine3d get_matrix(Pose _p)
+{
+    Eigen::Affine3d m = Eigen::Affine3d::Identity();
+
+    double sx = sin(_p.o.x_angle_rad);
+    double cx = cos(_p.o.x_angle_rad);
+    double sy = sin(_p.o.y_angle_rad);
+    double cy = cos(_p.o.y_angle_rad);
+    double sz = sin(_p.o.z_angle_rad);
+    double cz = cos(_p.o.z_angle_rad);
+
+
+    m(0,0) = cy * cz;
+    m(1,0) = cz * sx * sy + cx * sz;
+    m(2,0) = -cx * cz * sy + sx * sz;
+
+    m(0,1) = -cy * sz;
+    m(1,1) = cx * cz - sx * sy * sz;
+    m(2,1) = cz * sx + cx * sy * sz;
+
+    m(0,2) = sy;
+    m(1,2) = -cy * sx;
+    m(2,2) = cx * cy;
+
+    m(0,3) = _p.p.x;
+    m(1,3) = _p.p.y;
+    m(2,3) = _p.p.z;
+
+    return m;
+}
+
+void initial_step(HostDeviceData& data){
+	/*global_structures.particles.clear();
+
+	std::uniform_int_distribution<> random_index(0, global_structures.particle_filter_initial_guesses.size());
+	for (size_t i = 0; i < global_structures.max_particles; i++)
+	{
+		int index = random_index(gen_initial_guesses);
+
+		Particle p;
+		p.is_tracking = false;
+		p.W = 0;
+		p.nW = 0;
+		p.overlap = 0;
+		p.pose = global_structures.particle_filter_initial_guesses[index].pose;
+		global_structures.particles.push_back(p);
+	}
+	global_structures.particle_filter_state = ParticleFilterState::normal;
+	std::cout << "initial_step global_structures.particles.size(): " << global_structures.particles.size() << std::endl;
+*/}
+
+void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::vector<Point> points_local)
+{
+	auto start = std::chrono::steady_clock::now();
+
+	if(data.particle_filter_state == ParticleFilterState::initial){
+		//initial_step(global_structures);
+	}else if(data.particle_filter_state == ParticleFilterState::normal){
+
+	}
+
+	auto end = std::chrono::steady_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end-start;
+	printf("time: %-10f\n",elapsed_seconds.count());
 }

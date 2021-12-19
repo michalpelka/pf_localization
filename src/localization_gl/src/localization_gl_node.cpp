@@ -97,6 +97,13 @@ int main (int argc, char *argv[])
 }
 
 void display() {
+	//
+	//
+	std::vector<Point> points;
+	Pose pose_update;
+
+	particle_filter_step(host_device_data, pose_update, points);
+
     if (!ros::ok()){
         return;
     }
