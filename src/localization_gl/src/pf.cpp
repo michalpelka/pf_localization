@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "pf.h"
 #include "rgd.cuh"
 
@@ -188,7 +190,7 @@ void compute_occupancy(std::vector<Point> &host_points,	Grid3DParams params, std
 	}
 }
 
-Pose getPose(Eigen::Affine3d _m)
+Pose get_pose(Eigen::Affine3d _m)
 {
     Pose pose;
     /*Eigen::Vector3d ea = _m.rotation().eulerAngles(0, 1, 2);
@@ -237,7 +239,7 @@ Pose getPose(Eigen::Affine3d _m)
     return pose;
 }
 
-Eigen::Affine3d getMatrix(Pose _p)
+Eigen::Affine3d get_matrix(Pose _p)
 {
     Eigen::Affine3d m = Eigen::Affine3d::Identity();
 
@@ -266,4 +268,39 @@ Eigen::Affine3d getMatrix(Pose _p)
     m(2,3) = _p.p.z;
 
     return m;
+}
+
+void initial_step(HostDeviceData& data){
+	/*global_structures.particles.clear();
+
+	std::uniform_int_distribution<> random_index(0, global_structures.particle_filter_initial_guesses.size());
+	for (size_t i = 0; i < global_structures.max_particles; i++)
+	{
+		int index = random_index(gen_initial_guesses);
+
+		Particle p;
+		p.is_tracking = false;
+		p.W = 0;
+		p.nW = 0;
+		p.overlap = 0;
+		p.pose = global_structures.particle_filter_initial_guesses[index].pose;
+		global_structures.particles.push_back(p);
+	}
+	global_structures.particle_filter_state = ParticleFilterState::normal;
+	std::cout << "initial_step global_structures.particles.size(): " << global_structures.particles.size() << std::endl;
+*/}
+
+void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::vector<Point> points_local)
+{
+	auto start = std::chrono::steady_clock::now();
+
+	if(data.particle_filter_state == ParticleFilterState::initial){
+		//initial_step(global_structures);
+	}else if(data.particle_filter_state == ParticleFilterState::normal){
+
+	}
+
+	auto end = std::chrono::steady_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end-start;
+	printf("time: %-10f\n",elapsed_seconds.count());
 }
