@@ -38,6 +38,11 @@ enum ParticleFilterState{
 	normal
 };
 
+enum ParticleStatus{
+	to_kill,
+	to_alive
+};
+
 struct Position
 {
 	double x;
@@ -81,8 +86,12 @@ struct HostDeviceData{
 
 	char particle_filter_state;
 	std::vector<Particle> particle_filter_initial_guesses;
+	std::vector<Particle> particles;
 
 	float initial_w;
+	int max_particles;
+
+	Pose std_update;
 
 	~HostDeviceData(){
 		cudaFree(device_map);
