@@ -67,10 +67,12 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
 void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
 {
     Eigen::Affine3d transform(Eigen::Affine3d::Identity());
-    std::lock_guard<std::mutex> lck(mtx_input_data);
+
     transform.translation() = Eigen::Vector3d{odo->pose.pose.position.x,odo->pose.pose.position.y,odo->pose.pose.position.z};
     transform.rotate(Eigen::Quaterniond{odo->pose.pose.orientation.w,odo->pose.pose.orientation.x,
                                         odo->pose.pose.orientation.y,odo->pose.pose.orientation.z});
+    std::lock_guard<std::mutex> lck(mtx_input_data);
+    odometry = transform;
 }
 int main (int argc, char *argv[])
 {
@@ -87,7 +89,9 @@ int main (int argc, char *argv[])
     map_cloud = nullptr;
     ros::init(argc, argv, "localization_gl");
     ros::NodeHandle n;
-    ros::Subscriber sub = n.subscribe("/velodyne_points", 1, pointcloud_callback);
+    ros::Subscriber sub1 = n.subscribe("/velodyne_points", 1, pointcloud_callback);
+    ros::Subscriber sub2 = n.subscribe("/odometry/filtered", 1, odometry_callback);
+
 
     std::thread gl_th(gl_main, argc, argv);
     ros::spin();
@@ -101,13 +105,14 @@ void display() {
 	Pose pose_update;
     {
         std::lock_guard<std::mutex> lck(mtx_input_data);
-        odometry_increment = odometry * last_odometry.inverse();
+        odometry_increment =  last_odometry.inverse()* odometry;
         last_odometry = odometry;
         points.resize(input_data.size());
         std::transform(input_data.begin(),input_data.end(), points.begin(),
                        [](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
         pose_update = get_pose(odometry_increment);
     }
+    std::cout << pose_update.p.x <<"\t" << pose_update.p.y <<"\t" << pose_update.o.z_angle_rad << std::endl;
 	particle_filter_step(host_device_data, pose_update, points);
 
     if (!ros::ok()){
