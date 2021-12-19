@@ -11,6 +11,7 @@
 #include "imgui_impl_opengl2.h"
 
 #include <pcl/common/transforms.h>
+#include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
 const unsigned int window_width = 1920;
 const unsigned int window_height = 1080;
@@ -23,6 +24,8 @@ bool gui_mouse_down{false};
 int windows_handle = -1;
 std::mutex mtx_input_data;
 pcl::PointCloud<pcl::PointXYZI> input_data;
+Eigen::Affine3d odometry {Eigen::Affine3d::Identity()};
+Eigen::Affine3d odometry_increment{Eigen::Affine3d::Identity()};
 
 void display();
 void reshape(int w, int h);
@@ -47,13 +50,26 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>&  msg){
     transform.translation().x() = 0.2;
     transform.rotate(Eigen::Quaternionf(0.96593,0,0,-0.25882));
     pcl::transformPointCloud(msg, input_data, transform);
+}
+void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
+{
+    Eigen::Affine3d transform(Eigen::Affine3d::Identity());
+    transform.translation() = Eigen::Vector3d{odo->pose.pose.position.x,odo->pose.pose.position.y,odo->pose.pose.position.z};
+    transform.rotate(Eigen::Quaterniond{odo->pose.pose.orientation.w,odo->pose.pose.orientation.x,
+                                        odo->pose.pose.orientation.y,odo->pose.pose.orientation.z});
 
+    odometry_increment = transform * odometry.inverse();
+    odometry = transform;
+    std::cout << "============" << std::endl;
+    std::cout << odometry_increment.matrix() << std::endl;
 }
 int main (int argc, char *argv[])
 {
     ros::init(argc, argv, "localization_gl");
     ros::NodeHandle n;
-    ros::Subscriber sub = n.subscribe("/velodyne_points", 1, pointcloud_callback);
+    ros::Subscriber sub1 = n.subscribe("/velodyne_points", 1, pointcloud_callback);
+    ros::Subscriber sub2 = n.subscribe("/odometry/filtered", 1, odometry_callback);
+
 
     std::thread gl_th(gl_main, argc, argv);
     ros::spin();
