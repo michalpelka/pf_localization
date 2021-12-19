@@ -27,6 +27,23 @@ void initialize_host_device_data(HostDeviceData& data)
 
 	data.particle_filter_state = ParticleFilterState::initial;
 
+	data.initial_w = -0.2;
+
+	for(size_t i = 0 ; i < 10000000; i++){
+		Pose pose;
+		pose.p.x = (((float(rand()%1000000))/1000000.0f) - 0.5) * 200.0;
+		pose.p.y = (((float(rand()%1000000))/1000000.0f) - 0.5) * 200.0;
+		pose.o.z_angle_rad = (((float(rand()%1000000))/1000000.0f) - 0.5) * 2.0 * M_PI;
+
+		Particle p;
+		p.is_tracking = false;
+		p.pose = pose;
+		p.W = data.initial_w;
+		p.nW = 0;
+
+		data.particle_filter_initial_guesses.push_back(p);
+	}
+
 #if 0
 
 
@@ -114,8 +131,6 @@ void initialize_host_device_data(HostDeviceData& data)
 	std::normal_distribution<double> dist_z_angle(global_structures.mean_initial_guess_z_angle_deg, global_structures.std_initial_guess_z_angle_deg);
 
 	// for(size_t i = 0 ; i < 10000000; i++){
-
-
 	// 	Particle particle;
 	// 	particle.W = 1;
 	// 	particle.nW = 0;
@@ -134,36 +149,7 @@ void initialize_host_device_data(HostDeviceData& data)
 
 
 
-	std::normal_distribution<double> dist_angle(0,global_structures.std_cylinder_angle_deg*M_PI/180.0);
-	for(size_t i = 0 ; i < 10000000; i++){
-		Pose pose;
-		pose.p.x=20;
-		pose.o.z_angle_rad=M_PI;
-		Eigen::Affine3d m_pose = getMatrix(pose);
 
-		Pose pose_rot_z;
-		pose_rot_z.o.z_angle_rad = (((float(rand()%1000000))/1000000.0f) - 0.5) * 2.0 * M_PI;
-		Eigen::Affine3d m_rot_z = getMatrix(pose_rot_z);
-
-		Eigen::Affine3d m_res = m_rot_z * m_pose;
-
-		Pose pose_res = getPose(m_res);
-
-		Particle p;
-		p.is_tracking = false;
-		p.pose = pose_res;
-		p.W = global_structures.initial_w_cylinder_particles;
-		p.nW = 0;
-
-		p.pose.p.x += dist_x(generator);//((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * global_structures.std_cylinder_x;
-		p.pose.p.y += dist_y(generator);//((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * global_structures.std_cylinder_y;
-		p.pose.p.z += dist_z();//((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * global_structures.std_cylinder_z;
-		p.pose.o.x_angle_rad += ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * global_structures.std_cylinder_x_angle_deg);
-		p.pose.o.y_angle_rad += ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * global_structures.std_cylinder_y_angle_deg);
-		p.pose.o.z_angle_rad += ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * global_structures.std_cylinder_z_angle_deg);
-		// printf("%lf,%lf,%lf,%lf,%lf,%lf\n",p.pose.p.x,p.pose.p.y,p.pose.p.z,p.pose.o.x_angle_rad,p.pose.o.y_angle_rad,p.pose.o.z_angle_rad);
-		global_structures.particle_filter_initial_guesses.push_back(p);
-	}
 
 
 

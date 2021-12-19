@@ -38,6 +38,36 @@ enum ParticleFilterState{
 	normal
 };
 
+struct Position
+{
+	double x;
+	double y;
+	double z;
+};
+
+struct Orientation
+{
+	double x_angle_rad;
+	double y_angle_rad;
+	double z_angle_rad;
+};
+
+struct Pose
+{
+	Position p;
+	Orientation o;
+	Pose(){p.x = p.y = p.z = o.x_angle_rad = o.y_angle_rad = o.z_angle_rad = 0.0;};
+};
+
+struct Particle{
+	float W;
+	float nW;
+	float overlap;
+	Pose pose;
+	char status;
+	bool is_tracking;
+};
+
 struct HostDeviceData{
 	std::vector<Point> host_map;
 	Point *device_map;
@@ -50,6 +80,9 @@ struct HostDeviceData{
 	Grid3DParams map_grid3Dparams;
 
 	char particle_filter_state;
+	std::vector<Particle> particle_filter_initial_guesses;
+
+	float initial_w;
 
 	~HostDeviceData(){
 		cudaFree(device_map);
