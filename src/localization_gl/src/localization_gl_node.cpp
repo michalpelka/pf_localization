@@ -12,6 +12,10 @@
 
 #include <pcl/common/transforms.h>
 #include <ros/ros.h>
+
+#include "structs.h"
+#include "pf.h"
+
 const unsigned int window_width = 1920;
 const unsigned int window_height = 1080;
 int mouse_old_x, mouse_old_y;
@@ -23,6 +27,7 @@ bool gui_mouse_down{false};
 int windows_handle = -1;
 std::mutex mtx_input_data;
 pcl::PointCloud<pcl::PointXYZI> input_data;
+HostDeviceData host_device_data;
 
 void display();
 void reshape(int w, int h);
@@ -51,6 +56,9 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>&  msg){
 }
 int main (int argc, char *argv[])
 {
+	//ToDo data.host_map -> load map from file
+	initialize_host_device_data(host_device_data);
+
     ros::init(argc, argv, "localization_gl");
     ros::NodeHandle n;
     ros::Subscriber sub = n.subscribe("/velodyne_points", 1, pointcloud_callback);
@@ -102,6 +110,11 @@ void display() {
         }
         glEnd();
     }
+
+    //ToDo data -> render map from file
+
+    ///////////////////////
+
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
     ImGui::Begin("Demo Window1");
