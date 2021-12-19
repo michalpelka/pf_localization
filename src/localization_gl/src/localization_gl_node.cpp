@@ -97,18 +97,8 @@ int main (int argc, char *argv[])
 }
 
 void display() {
-	//
-	//
 	std::vector<Point> points;
 	Pose pose_update;
-
-	particle_filter_step(host_device_data, pose_update, points);
-
-    if (!ros::ok()){
-        return;
-    }
-    std::vector<Point> points;
-    Pose pose_update;
     {
         std::lock_guard<std::mutex> lck(mtx_input_data);
         odometry_increment = odometry * last_odometry.inverse();
@@ -116,6 +106,12 @@ void display() {
         points.resize(input_data.size());
         std::transform(input_data.begin(),input_data.end(), points.begin(),
                        [](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
+        pose_update = get_pose(odometry_increment);
+    }
+	particle_filter_step(host_device_data, pose_update, points);
+
+    if (!ros::ok()){
+        return;
     }
 
     ImGuiIO& io = ImGui::GetIO();
