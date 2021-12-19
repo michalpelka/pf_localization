@@ -387,7 +387,7 @@ void update_propability(HostDeviceData& data)
 
 
 	//here
-	double max_w = -10000000000;
+	/*double max_w = -10000000000;
 	for(size_t i = 0 ; i < data.particles.size(); i++){
 		if(data.particles[i].W > max_w){
 			max_w = data.particles[i].W;
@@ -396,9 +396,7 @@ void update_propability(HostDeviceData& data)
 
 	for(size_t i = 0 ; i < data.particles.size(); i++){
 		data.particles[i].W -= max_w;
-	}
-
-
+	}*/
 }
 
 inline bool compareParticle_nW(const Particle& a, const Particle& b)
@@ -410,16 +408,16 @@ void resample(HostDeviceData& data)
 {
 	if(data.particles.size() == 0)return;
 
-	float max_weight=0;
+	double max_weight=0;
 
-	float lmax = data.particles[0].W;
+	double lmax = data.particles[0].W;
 	for(size_t i = 1; i < data.particles.size(); i++)
 	{
 		if(data.particles[i].W > lmax)lmax = data.particles[i].W;
 	}
 
-	float gain = 1.0f;
-	float sum = 0.0f;
+	double gain = 1.0f;
+	double sum = 0.0f;
 	for(size_t i = 0; i < data.particles.size(); i++)
 	{
 		data.particles[i].nW = std::exp((data.particles[i].W - lmax) * gain);
@@ -482,7 +480,11 @@ std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data)
 		int index = random_index(gen_resample_index);
 		Particle p;
 		p.is_tracking = false;
-		p.W = data.initial_w_exploration_particles;
+		if(data.particles.size() > 0){
+			p.W = data.particles[0].W;
+		}else{
+			p.W = data.initial_w_exploration_particles;
+		}
 		p.nW = 0;
 		p.overlap = 0;
 		p.pose = data.particle_filter_initial_guesses[index].pose;
