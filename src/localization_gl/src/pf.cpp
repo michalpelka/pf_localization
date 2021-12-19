@@ -15,8 +15,8 @@ void initialize_host_device_data(HostDeviceData& data)
 	cudaMemcpy(data.device_map, data.host_map.data(), sizeof(Point)*data.host_map.size(), cudaMemcpyHostToDevice);
 	data.device_map_size = data.host_map.size();
 
-	data.map_grid3Dparams.resolution_X = 1.0;
-	data.map_grid3Dparams.resolution_Y = 1.0;
+	data.map_grid3Dparams.resolution_X = 0.2;
+	data.map_grid3Dparams.resolution_Y = 0.2;
 	data.map_grid3Dparams.resolution_Z = 1000.0;
 	data.map_grid3Dparams.bounding_box_extension = 1;
 
@@ -36,7 +36,7 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.particle_filter_state = ParticleFilterState::initial;
 
 	//data.initial_w = -0.1;
-	data.initial_w_exploration_particles = -0.0000001;
+	data.initial_w_exploration_particles = -2.0;
 
 	data.max_particles = 100000;
 	data.min_dump_propability_no_observations = -1000000.0;
@@ -227,11 +227,15 @@ void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::ve
 		std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
 		data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
 
+		//normalize all to 1
+
 		update_poses(data, pose_update);
 		compute_overlaps(data, points_local);
 		normalize_W(data);
 		update_propability(data);
 		resample(data);
+
+		//normalize_W(data);
 
 		//std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
 		//std::vector<Particle> motion_model_particles = get_motion_model_particles(data);
