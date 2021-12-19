@@ -89,9 +89,16 @@ struct HostDeviceData{
 	std::vector<Particle> particles;
 
 	float initial_w;
+	float initial_w_exploration_particles;
 	int max_particles;
 
 	Pose std_update;
+
+	float min_dump_propability_no_observations;
+	float min_dump_propability_tracking;
+	float min_dump_propability;
+
+	float percent_particles_from_initial;
 
 	~HostDeviceData(){
 		cudaFree(device_map);

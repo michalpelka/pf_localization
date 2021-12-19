@@ -115,6 +115,15 @@ void display() {
     std::cout << pose_update.p.x <<"\t" << pose_update.p.y <<"\t" << pose_update.o.z_angle_rad << std::endl;
 	particle_filter_step(host_device_data, pose_update, points);
 
+	if(host_device_data.particles.size()> 0){
+		std::cout << "best pose" << std::endl;
+		Eigen::Affine3d m = get_matrix(host_device_data.particles[0].pose);
+		std::cout << m.matrix() << std::endl;
+	}
+
+
+
+
     if (!ros::ok()){
         return;
     }

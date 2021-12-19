@@ -6,7 +6,8 @@
 
 
 std::default_random_engine gen_initial_guesses;
-
+std::default_random_engine gen_resample_index;
+std::default_random_engine gen_resample_beta;
 
 void initialize_host_device_data(HostDeviceData& data)
 {
@@ -35,7 +36,14 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.particle_filter_state = ParticleFilterState::initial;
 
 	data.initial_w = -0.2;
+	data.initial_w_exploration_particles = -0.1;
+
 	data.max_particles = 10000;
+	data.min_dump_propability_no_observations = -1.0;
+	data.min_dump_propability_tracking = -0.1;
+	data.min_dump_propability = -10;
+	data.percent_particles_from_initial = 0.8;
+
 
 	for(size_t i = 0 ; i < 10000000; i++){
 		Pose pose;
@@ -56,18 +64,16 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.std_update.p.y = 0.01;
 	data.std_update.p.z = 0.01;
 	data.std_update.o.x_angle_rad = 0.001 * M_PI/180.0;
-	data.std_update.o.y_angle_rad = 0.001 * M_PI/180.0;;
-	data.std_update.o.z_angle_rad = 0.001 * M_PI/180.0;;
+	data.std_update.o.y_angle_rad = 0.001 * M_PI/180.0;
+	data.std_update.o.z_angle_rad = 0.001 * M_PI/180.0;
 
 #if 0
 
 
 
 
-	global_structures.percent_particles_from_initial=0.9;
-	global_structures.max_particles=30000;
 
-	global_structures.particle_filter_state = initial;
+
 	global_structures.min_dump_propability = -10;//-0.1;
 	global_structures.min_dump_propability_tracking = -0.1;//-0.01;
 	global_structures.min_dump_propability_no_bservations = -1.0;
@@ -307,6 +313,15 @@ void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::ve
 	}else if(data.particle_filter_state == ParticleFilterState::normal){
 		update_poses(data, pose_update);
 		compute_overlaps(data, points_local);
+		normalize_W(data);
+		update_propability(data);
+		resample(data);
+
+		std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
+		//motion mode autobus
+		data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
+
+
 
 		//for(size_t i = 0 ; i < data.particles.size(); i++){
 		//	std::cout << data.particles[i].overlap << " ";
@@ -368,4 +383,153 @@ void compute_overlaps(HostDeviceData& data, std::vector<Point>& points)
 
 	cudaFree(device_points);
 	cudaFree(device_particles);
+
+	normalize_overlaps(data);
+}
+
+void normalize_overlaps(HostDeviceData& data){
+	if(data.particles.size() == 0)return;
+
+	float max_hits = std::numeric_limits<float>::min();
+	for(size_t i = 0 ; i < data.particles.size(); i++){
+		if(data.particles[i].overlap > max_hits)max_hits = data.particles[i].overlap;
+	}
+
+	if(max_hits <= 0)return;
+
+	for(size_t i = 0 ; i < data.particles.size(); i++){
+		data.particles[i].overlap /= max_hits;
+	}
+}
+
+void normalize_W(HostDeviceData& data){
+	if(data.particles.size() == 0)return;
+
+	double max_w = std::numeric_limits<double>::min();
+	for(size_t i = 0 ; i < data.particles.size(); i++){
+		if(data.particles[i].W > max_w){
+			max_w = data.particles[i].W;
+		}
+	}
+
+	for(size_t i = 0 ; i < data.particles.size(); i++){
+		data.particles[i].W -= max_w;
+	}
+}
+
+void update_propability(HostDeviceData& data)
+{
+	if(data.particles.size() == 0)return;
+
+	for(size_t i = 0 ; i < data.particles.size(); i++){
+		double dump = data.min_dump_propability_no_observations;
+
+		if(data.particles[i].overlap > 0.0){
+			dump = std::log(data.particles[i].overlap);
+
+
+			if(data.particles[i].is_tracking){
+				if(dump < data.min_dump_propability_tracking){
+					dump = data.min_dump_propability_tracking;
+				}
+			}else{
+				if(dump < data.min_dump_propability){
+					dump = data.min_dump_propability;
+				}
+			}
+		}
+
+		data.particles[i].W += dump;
+		data.particles[i].is_tracking = false;
+	}
+}
+
+inline bool compareParticle_nW(const Particle& a, const Particle& b)
+{
+	return a.nW > b.nW;
+}
+
+void resample(HostDeviceData& data)
+{
+	if(data.particles.size() == 0)return;
+
+	float max_weight=0;
+
+	float lmax = data.particles[0].W;
+	for(size_t i = 1; i < data.particles.size(); i++)
+	{
+		if(data.particles[i].W > lmax)lmax = data.particles[i].W;
+	}
+
+	float gain = 1.0f;
+	float sum = 0.0f;
+	for(size_t i = 0; i < data.particles.size(); i++)
+	{
+		data.particles[i].nW = std::exp((data.particles[i].W - lmax) * gain);
+		sum += data.particles[i].nW;
+	}
+
+	for(size_t i = 0; i < data.particles.size(); i++)
+	{
+		data.particles[i].nW /= sum;
+	}
+
+	for(size_t i = 0; i < data.particles.size(); i++)
+	{
+		if(data.particles[i].nW>max_weight)
+			max_weight=data.particles[i].nW;
+	}
+
+	// Resample
+	std::sort(data.particles.begin(), data.particles.end(), compareParticle_nW);
+
+
+	double beta = 0.0;
+
+	std::uniform_int_distribution<> uniform_int(0, data.particles.size());
+	int index = uniform_int(gen_resample_index);
+
+	std::vector<Particle> new_particles;
+
+	std::uniform_real_distribution<> uniform_double(0.0, 2.0 * max_weight);
+
+	for (size_t i = 0; i < data.max_particles; i++)
+	{
+		beta += uniform_double(gen_resample_beta);
+		while (data.particles[index].nW < beta)
+		{
+			beta -= data.particles[index].nW;
+			index = (index + 1) % data.particles.size();
+		}
+		Particle p;
+		p.status=ParticleStatus::to_alive;
+		p.pose = data.particles[index].pose;
+		p.W = data.particles[index].W;
+		p.nW = data.particles[index].nW;
+		p.overlap = 0;
+		new_particles.push_back(p);
+	}
+
+	data.particles = new_particles;
+
+	std::sort(data.particles.begin(), data.particles.end(), compareParticle_nW);
+}
+
+std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data)
+{
+	std::vector<Particle> exploration_particles;
+
+	std::uniform_int_distribution<> random_index(0, data.particle_filter_initial_guesses.size());
+	for (size_t i = data.max_particles * (1-data.percent_particles_from_initial); i < data.max_particles; i++)
+	{
+		int index = random_index(gen_resample_index);
+		Particle p;
+		p.is_tracking = false;
+		p.W = data.initial_w_exploration_particles;
+		p.nW = 0;
+		p.overlap = 0;
+		p.pose = data.particle_filter_initial_guesses[index].pose;
+		exploration_particles.push_back(p);
+	}
+	return exploration_particles;
 }
