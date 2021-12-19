@@ -1,0 +1,3 @@
+[submodule "src/localization_gl/3rd/imgui"]
+	path = src/localization_gl/3rd/imgui
+	url = https://github.com/ocornut/imgui.git
