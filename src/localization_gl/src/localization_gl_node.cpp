@@ -93,6 +93,11 @@ int main (int argc, char *argv[])
 }
 
 void display() {
+	//std::vector<Point> points;
+	//Pose pose_update;
+
+
+
     if (!ros::ok()){
         return;
     }

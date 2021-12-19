@@ -187,3 +187,83 @@ void compute_occupancy(std::vector<Point> &host_points,	Grid3DParams params, std
 		}
 	}
 }
+
+Pose getPose(Eigen::Affine3d _m)
+{
+    Pose pose;
+    /*Eigen::Vector3d ea = _m.rotation().eulerAngles(0, 1, 2);
+
+    pose.o.x_angle_rad = ea.x();
+    pose.o.y_angle_rad = ea.y();
+    pose.o.z_angle_rad = ea.z();
+    pose.p.x = _m.translation().x();
+    pose.p.y = _m.translation().y();
+    pose.p.z = _m.translation().z();*/
+
+    pose.p.x = _m(0,3);
+    pose.p.y = _m(1,3);
+    pose.p.z = _m(2,3);
+
+    if (_m(0,2) < 1) {
+        if (_m(0,2) > -1) {
+            pose.o.y_angle_rad = asin(_m(0,2));
+            pose.o.x_angle_rad = atan2(-_m(1,2), _m(2,2));
+            pose.o.z_angle_rad = atan2(-_m(0,1), _m(0,0));
+
+            //double C = cos(out_p.o.roll_y_rad);
+            //out_p.o.pitch_x_rad = atan2(-in_m[r_12]/C, in_m[r_22]/C);
+            //out_p.o.yaw_z_rad = atan2(-in_m[r_01]/C, in_m[r_00]/C);
+
+        }
+        else //r02 = −1
+        {
+            // not a unique solution: thetaz − thetax = atan2 ( r10 , r11 )
+            pose.o.y_angle_rad = -M_PI / 2.0;
+            pose.o.x_angle_rad = -atan2(_m(1,0), _m(1,1));
+            pose.o.z_angle_rad = 0;
+            return pose;
+        }
+    }
+    else {
+        // r02 = +1
+        // not a unique solution: thetaz + thetax = atan2 ( r10 , r11 )
+        pose.o.y_angle_rad = M_PI / 2.0;
+        pose.o.x_angle_rad = atan2(_m(1,0), _m(1,1));
+        pose.o.z_angle_rad = 0.0;
+        return pose;
+    }
+
+
+    return pose;
+}
+
+Eigen::Affine3d getMatrix(Pose _p)
+{
+    Eigen::Affine3d m = Eigen::Affine3d::Identity();
+
+    double sx = sin(_p.o.x_angle_rad);
+    double cx = cos(_p.o.x_angle_rad);
+    double sy = sin(_p.o.y_angle_rad);
+    double cy = cos(_p.o.y_angle_rad);
+    double sz = sin(_p.o.z_angle_rad);
+    double cz = cos(_p.o.z_angle_rad);
+
+
+    m(0,0) = cy * cz;
+    m(1,0) = cz * sx * sy + cx * sz;
+    m(2,0) = -cx * cz * sy + sx * sz;
+
+    m(0,1) = -cy * sz;
+    m(1,1) = cx * cz - sx * sy * sz;
+    m(2,1) = cz * sx + cx * sy * sz;
+
+    m(0,2) = sy;
+    m(1,2) = -cy * sx;
+    m(2,2) = cx * cy;
+
+    m(0,3) = _p.p.x;
+    m(1,3) = _p.p.y;
+    m(2,3) = _p.p.z;
+
+    return m;
+}
