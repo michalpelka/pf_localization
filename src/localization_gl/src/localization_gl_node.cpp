@@ -76,7 +76,7 @@ int main (int argc, char *argv[])
 
     host_device_data.host_map.resize(map_cloud->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
-                   [](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z};});
+                   [](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
 
 	initialize_host_device_data(host_device_data);
 
