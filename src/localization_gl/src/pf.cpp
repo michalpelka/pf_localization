@@ -9,6 +9,8 @@ std::default_random_engine gen_initial_guesses;
 std::default_random_engine gen_resample_index;
 std::default_random_engine gen_resample_beta;
 
+std::default_random_engine generator;
+
 void initialize_host_device_data(HostDeviceData& data)
 {
 	cudaMalloc((void **)&data.device_map, sizeof(Point)*data.host_map.size());
@@ -49,10 +51,10 @@ void initialize_host_device_data(HostDeviceData& data)
 
 	for(size_t i = 0 ; i < 10000000; i++){
 		Pose pose;
-		pose.p.x = (((float(rand()%1000000))/1000000.0f) - 0.5) * 200.0;
-		pose.p.y = (((float(rand()%1000000))/1000000.0f) - 0.5) * 200.0;
-		pose.o.z_angle_rad = (((float(rand()%1000000))/1000000.0f) - 0.5) * 2.0 * M_PI;
-
+		const float update_x = (((float(rand()%1000000))/1000000.0f) - 0.5) * 200.0;
+        const float update_y = (((float(rand()%1000000))/1000000.0f) - 0.5) * 200.0;
+        const float update_angle_rad = (((float(rand()%1000000))/1000000.0f) - 0.5) * 2.0 * M_PI;
+        pose = updatePose(pose, update_x, update_y, 0,0,0,update_angle_rad);
 		Particle p;
 		p.is_tracking = false;
 		p.pose = pose;
@@ -62,12 +64,12 @@ void initialize_host_device_data(HostDeviceData& data)
 		data.particle_filter_initial_guesses.push_back(p);
 	}
 
-	data.std_update.p.x = 0.1;
-	data.std_update.p.y = 0.02;
-	data.std_update.p.z = 0.0;
-	data.std_update.o.x_angle_rad = 0.0;
-	data.std_update.o.y_angle_rad = 0.0;
-	data.std_update.o.z_angle_rad = 2.0 * M_PI/180.0;
+	data.std_update[0] = 0.1;
+	data.std_update[1] = 0.02;
+	data.std_update[2] = 0.0;
+	data.std_update[3] = 0.0;
+	data.std_update[4] = 0.0;
+	data.std_update[5] = 2.0 * M_PI/180.0;
 
 	data.std_motion_model_x = 0.5;
 	data.std_motion_model_y = 0.1;
@@ -152,6 +154,17 @@ Pose get_pose(const Eigen::Affine3d& _m)
 
 
     return pose;
+}
+Pose updatePose(const Pose& _p, double x, double y, double z, double ox,double oy, double oz){
+    Pose _rp;
+    _rp.p.x= _p.p.x +x ;
+    _rp.p.y= _p.p.y +y ;
+    _rp.p.z= _p.p.z +z ;
+
+    _rp.o.x_angle_rad += _p.o.x_angle_rad + ox;
+    _rp.o.y_angle_rad += _p.o.y_angle_rad + oy;
+    _rp.o.z_angle_rad += _p.o.z_angle_rad + oz;
+    return _rp;
 }
 
 Eigen::Affine3d get_matrix(const Pose& _p)
@@ -253,7 +266,6 @@ void update_poses(HostDeviceData& data, const Pose& pose_update)
 {
 	if(data.particles.size() == 0)return;
 
-	std::default_random_engine generator;
 	/*std::normal_distribution<double> dist_x(-data.std_update.p.x, data.std_update.p.x);
 	std::normal_distribution<double> dist_y(-data.std_update.p.y, data.std_update.p.y);
 	std::normal_distribution<double> dist_z(-data.std_update.p.z, data.std_update.p.z);
@@ -261,26 +273,26 @@ void update_poses(HostDeviceData& data, const Pose& pose_update)
 	std::normal_distribution<double> dist_y_angle(-data.std_update.o.y_angle_rad, data.std_update.o.y_angle_rad);
 	std::normal_distribution<double> dist_z_angle(-data.std_update.o.z_angle_rad, data.std_update.o.z_angle_rad);*/
 
-	std::normal_distribution<double> dist_x(0, data.std_update.p.x);
-	std::normal_distribution<double> dist_y(0, data.std_update.p.y);
-	std::normal_distribution<double> dist_z(0, data.std_update.p.z);
-	std::normal_distribution<double> dist_x_angle(0, data.std_update.o.x_angle_rad);
-	std::normal_distribution<double> dist_y_angle(0, data.std_update.o.y_angle_rad);
-	std::normal_distribution<double> dist_z_angle(0, data.std_update.o.z_angle_rad);
+	std::normal_distribution<double> dist_x(0, data.std_update[0]);
+	std::normal_distribution<double> dist_y(0, data.std_update[1]);
+	std::normal_distribution<double> dist_z(0, data.std_update[2]);
+	std::normal_distribution<double> dist_x_angle(0, data.std_update[3]);
+	std::normal_distribution<double> dist_y_angle(0, data.std_update[4]);
+	std::normal_distribution<double> dist_z_angle(0, data.std_update[5]);
 
 	for(size_t i = 0 ; i < data.particles.size(); i++){
-		Pose pose_update_with_noise = pose_update;
-		pose_update_with_noise.p.x += dist_x(generator);
-		pose_update_with_noise.p.y += dist_y(generator);
-		//pose_update_with_noise.p.z += dist_z(generator);
-		//pose_update_with_noise.o.x_angle_rad += dist_x_angle(generator);
-		//pose_update_with_noise.o.y_angle_rad += dist_y_angle(generator);
-		pose_update_with_noise.o.z_angle_rad += dist_z_angle(generator);
-
-		//Pose p_increment;
-		//p_increment.p.x = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_update.p.x;
-		//p_increment.p.y = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_update.p.y;
-		//p_increment.o.z_angle_rad = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * data.std_update.o.z_angle_rad);
+		Pose pose_update_with_noise = updatePose(pose_update, dist_x(generator),dist_y(generator),0,0,0,dist_z_angle(generator))  ;
+//		pose_update_with_noise.p.x += dist_x(generator);
+//		pose_update_with_noise.p.y += dist_y(generator);
+//		//pose_update_with_noise.p.z += dist_z(generator);
+//		//pose_update_with_noise.o.x_angle_rad += dist_x_angle(generator);
+//		//pose_update_with_noise.o.y_angle_rad += dist_y_angle(generator);
+//		pose_update_with_noise.o.z_angle_rad += dist_z_angle(generator);
+//
+//		//Pose p_increment;
+//		//p_increment.p.x = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_update.p.x;
+//		//p_increment.p.y = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_update.p.y;
+//		//p_increment.o.z_angle_rad = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * data.std_update.o.z_angle_rad);
 
 
 		data.particles[i].pose = get_pose ( get_matrix(data.particles[i].pose) *  get_matrix(pose_update_with_noise) );
@@ -481,7 +493,7 @@ std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data)
 		Particle p;
 		p.is_tracking = false;
 		if(data.particles.size() > 0){
-			p.W = data.particles[0].W;
+			p.W = data.particles[data.particles.size()/2].W;
 		}else{
 			p.W = data.initial_w_exploration_particles;
 		}
@@ -497,17 +509,28 @@ std::vector<Particle> get_motion_model_particles(HostDeviceData& data)
 {
 	std::vector<Particle> particles;
 
+    std::normal_distribution<double> dist_x(0, data.std_update[0]);
+    std::normal_distribution<double> dist_y(0, data.std_update[1]);
+    std::normal_distribution<double> dist_z(0, data.std_update[2]);
+    std::normal_distribution<double> dist_x_angle(0, data.std_update[3]);
+    std::normal_distribution<double> dist_y_angle(0, data.std_update[4]);
+    std::normal_distribution<double> dist_z_angle(0, data.std_update[5]);
+
 	if(data.particles.size() > data.number_of_replicated_best_particles_motion_model){
 		for(size_t i = 0; i < data.number_of_replicated_best_particles_motion_model; i++){
 			for(size_t j = 0 ; j < data.number_of_replicatations_motion_model; j++){
-				Pose p_increment;
-				p_increment.p.x = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_x;
-				p_increment.p.y = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_y;
-				p_increment.o.z_angle_rad = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * data.std_motion_model_z_angle_deg);
+				//Pose p_increment;
+                //Pose pose_update_with_noise = updatePose(pose_update, dist_x(generator),dist_y(generator),0,0,0,dist_z_angle(generator))  ;
+
+//				p_increment.p.x = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_x;
+//				p_increment.p.y = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * data.std_motion_model_y;
+//				p_increment.o.z_angle_rad = ((float(rand()%1000000)/1000000.0) - 0.5) * 2.0 * (M_PI/180.0 * data.std_motion_model_z_angle_deg);
 
 				Particle p;
 				p.is_tracking = true;
-				p.pose = get_pose(get_matrix(data.particles[i].pose) * get_matrix(p_increment));
+                p.pose = updatePose(p.pose, dist_x(generator),dist_y(generator),0,0,0,dist_z_angle(generator))  ;
+
+                //p.pose = get_pose(get_matrix(data.particles[i].pose) * get_matrix(p_increment));
 				p.W = data.particles[i].W;
 				p.nW = data.particles[i].nW;
 				//p.W = -0.001;

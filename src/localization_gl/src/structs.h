@@ -92,7 +92,7 @@ struct HostDeviceData{
 	float initial_w_exploration_particles;
 	int max_particles;
 
-	Pose std_update;
+	std::array<double,6> std_update;
 
 	float min_dump_propability_no_observations;
 	float min_dump_propability_tracking;

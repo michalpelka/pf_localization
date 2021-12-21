@@ -208,7 +208,7 @@ void display() {
     if(ImGui::Button("foo"))
     {
     	std::vector<Particle> exploration_particles = choose_random_exploration_particles(host_device_data);
-
+        host_device_data.particles.clear();
     	host_device_data.particles.insert(host_device_data.particles.end(), exploration_particles.begin(), exploration_particles.end());
 
 
