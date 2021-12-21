@@ -74,7 +74,7 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.std_motion_model_z_angle_deg = 1.0;
 }
 
-void compute_occupancy(std::vector<Point> &host_points,	Grid3DParams params, std::vector<char> &host_occupancy_map)
+void compute_occupancy(const std::vector<Point> &host_points,	const Grid3DParams& params, std::vector<char> &host_occupancy_map)
 {
 	for (size_t ind=0; ind < host_occupancy_map.size(); ++ind)
 	{
@@ -83,7 +83,7 @@ void compute_occupancy(std::vector<Point> &host_points,	Grid3DParams params, std
 
 	for(size_t index_of_point_source = 0 ; index_of_point_source < host_points.size(); index_of_point_source++){
 
-		Point &pSource = host_points[index_of_point_source];
+		const Point &pSource = host_points[index_of_point_source];
 
 		if(pSource.x < params.bounding_box_min_X || pSource.x > params.bounding_box_max_X)continue;
 		if(pSource.y < params.bounding_box_min_Y || pSource.y > params.bounding_box_max_Y)continue;
@@ -105,7 +105,7 @@ void compute_occupancy(std::vector<Point> &host_points,	Grid3DParams params, std
 	}
 }
 
-Pose get_pose(Eigen::Affine3d _m)
+Pose get_pose(const Eigen::Affine3d& _m)
 {
     Pose pose;
     /*Eigen::Vector3d ea = _m.rotation().eulerAngles(0, 1, 2);
@@ -154,7 +154,7 @@ Pose get_pose(Eigen::Affine3d _m)
     return pose;
 }
 
-Eigen::Affine3d get_matrix(Pose _p)
+Eigen::Affine3d get_matrix(const Pose& _p)
 {
     Eigen::Affine3d m = Eigen::Affine3d::Identity();
 
@@ -205,7 +205,7 @@ void initial_step(HostDeviceData& data){
 	std::cout << "initial_step global_structures.particles.size(): " << data.particles.size() << std::endl;
 }
 
-void particle_filter_step(HostDeviceData& data, const Pose& pose_update, std::vector<Point> points_local)
+void particle_filter_step(HostDeviceData& data, const Pose& pose_update, const std::vector<Point>& points_local)
 {
 	auto start = std::chrono::steady_clock::now();
 
@@ -287,7 +287,7 @@ void update_poses(HostDeviceData& data, const Pose& pose_update)
 	}
 }
 
-void compute_overlaps(HostDeviceData& data, std::vector<Point>& points)
+void compute_overlaps(HostDeviceData& data, const std::vector<Point>& points)
 {
 	Point *device_points;
 	cudaMalloc((void **)&device_points, sizeof(Point)*points.size());
