@@ -17,6 +17,12 @@
 #include "structs.h"
 #include "pf.h"
 
+#include "mirror_converter.h"
+
+std::vector<catoptric_livox::Mirror> mirrors;
+std::deque<pcl::PointCloud<pcl::PointXYZI>::Ptr> aggregated_pointcloud_odom;
+ros::Publisher aggregated_livox;
+
 const unsigned int window_width = 1920;
 const unsigned int window_height = 1080;
 int mouse_old_x, mouse_old_y;
@@ -73,6 +79,51 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
     pcl::transformPointCloud(filtered_cut_z, input_data, transform);
 }
 
+void pointcloud_callback_lvx(const livox_ros_driver::CustomMsg::ConstPtr& msg){
+    pcl::PointCloud<pcl::PointXYZI> cloud = catoptric_livox::converterLivoxMirror(mirrors, msg);
+    pcl::transformPointCloud(cloud, cloud, odometry.matrix().cast<float>());
+    aggregated_pointcloud_odom.push_back(cloud.makeShared());
+
+    if (aggregated_pointcloud_odom.size()>10){
+        aggregated_pointcloud_odom.pop_front();
+    }
+
+    Eigen::Affine3f odom_inv = odometry.inverse().cast<float>();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr aggregated(new  pcl::PointCloud<pcl::PointXYZI>);
+    for (auto &pc : aggregated_pointcloud_odom) {
+        for (int i = 0; i < pc->size(); i += 1) {
+            pcl::PointXYZI pt;
+            pt.getArray3fMap() = odom_inv* (*pc)[i].getArray3fMap();
+            pt.intensity = (*pc)[i].intensity;
+            aggregated->push_back(pt);
+        }
+    }
+
+    pcl::ApproximateVoxelGrid<pcl::PointXYZI> filter;
+    filter.setInputCloud(aggregated);
+    pcl::PointCloud<pcl::PointXYZI> filtered;
+    filter.setLeafSize(0.25,0.25,0.25);
+    filter.filter(filtered);
+
+    pcl::PointCloud<pcl::PointXYZI> filtered_cut_z;
+    filtered_cut_z.reserve(filtered.size());
+    for(const auto &ref:filtered){
+        if(fabs(ref.z-0.4)< 0.3 && ref.x*ref.x + ref.y*ref.y > 1.5*1.5){
+            filtered_cut_z.push_back(ref);
+        }
+    }
+    Eigen::Affine3f transform(Eigen::Affine3f::Identity());
+    transform.translation().x() = 0.2;
+
+    pcl::transformPointCloud(filtered_cut_z, input_data, transform);
+    input_data.header.frame_id ="base_link";
+    pcl_conversions::toPCL(ros::Time::now(), input_data.header.stamp);
+    if(aggregated_livox.getNumSubscribers()>0){
+        aggregated_livox.publish(input_data);
+    }
+
+}
+
 void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
 {
     Eigen::Affine3d transform(Eigen::Affine3d::Identity());
@@ -87,7 +138,8 @@ int main (int argc, char *argv[])
 {
 	//ToDo data.host_map -> load map from file
 	pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-	pcl::io::loadPCDFile("/home/janusz/DATA/Lustra-mid-70/p7p2_2d_clean.pcd", *map_cloud);
+	pcl::io::loadPCDFile("/media/michal/ext/p7p2_2d_clean.pcd", *map_cloud);
+    mirrors = catoptric_livox::loadMirrorFromPLY("/home/michal/code/livox_ws/src/pf_localization/test_lustro_hex_mid70.ply");
 
     host_device_data.host_map.resize(map_cloud->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
@@ -100,9 +152,11 @@ int main (int argc, char *argv[])
     map_cloud = nullptr;
     ros::init(argc, argv, "localization_gl");
     ros::NodeHandle n;
-    ros::Subscriber sub1 = n.subscribe("/velodyne_points", 1, pointcloud_callback);
-    ros::Subscriber sub2 = n.subscribe("/odometry/filtered", 1, odometry_callback);
+    //ros::Subscriber sub1 = n.subscribe("/velodyne_points", 1, pointcloud_callback);
+    ros::Subscriber sub1 = n.subscribe("/livox/lidar", 1, pointcloud_callback_lvx);
 
+    ros::Subscriber sub2 = n.subscribe("/odometry/filtered", 1, odometry_callback);
+    aggregated_livox = n.advertise<pcl::PointCloud<pcl::PointXYZI>>("/livox/lidar_mirror",1);
 
     std::thread gl_th(gl_main, argc, argv);
     ros::spin();

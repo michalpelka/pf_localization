@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   sensor_msgs
+  livox_ros_driver
 )
 
 
@@ -43,6 +44,8 @@ set(ImGui_Glut_src 3rd/imgui/imgui.cpp 3rd/imgui/imgui_demo.cpp 3rd/imgui/imgui_
         3rd/imgui/backends/imgui_impl_glut.cpp 3rd/imgui/backends/imgui_impl_opengl2.cpp)
 
 
+include_directories(livox_mirror 3rd/Sophus 3rd)
+add_library(livox_mirror livox_mirror/utils.cpp livox_mirror/utils_io.cpp livox_mirror/mirror_converter.cpp)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -181,7 +184,7 @@ cuda_add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Gl
 
 ## Specify libraries to link a library or executable target against
  target_link_libraries(localization_gl_node
-   ${catkin_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_glut_LIBRARY}
+   ${catkin_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_glut_LIBRARY} livox_mirror
  )
 
 #############
