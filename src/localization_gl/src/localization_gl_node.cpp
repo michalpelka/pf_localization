@@ -87,12 +87,20 @@ int main (int argc, char *argv[])
 	pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::io::loadPCDFile("//media/michal/ext/p7p2_2d_clean.pcd", *map_cloud);
 
+    pcl::PointCloud<pcl::PointXYZ>::Ptr map_traversability(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::io::loadPCDFile("//media/michal/ext/p7p2_2d_traversability.pcd", *map_traversability);
+
     host_device_data.host_map.resize(map_cloud->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
                    //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
     		[](const pcl::PointXYZI&p){return Point{p.x,p.y,0, PointType::obstacle };});
 
-
+    if (map_traversability) {
+        host_device_data.host_travesability.resize(map_traversability->size());
+        std::transform(map_traversability->begin(), map_traversability->end(), host_device_data.host_travesability.begin(),
+                //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
+                       [](const pcl::PointXYZ &p) { return Point{p.x, p.y, 0, PointType::obstacle}; });
+    }
 	initialize_host_device_data(host_device_data);
 
     map_cloud = nullptr;
@@ -207,12 +215,11 @@ void display() {
     ImGui::Text("Elapsed %.3f", host_device_data.step_time);
 
 
-    if(ImGui::Button("foo"))
+    if(ImGui::Button("reset"))
     {
     	std::vector<Particle> exploration_particles = choose_random_exploration_particles(host_device_data);
         host_device_data.particles.clear();
     	host_device_data.particles.insert(host_device_data.particles.end(), exploration_particles.begin(), exploration_particles.end());
-
 
         std::cout << "bar\n";
     }

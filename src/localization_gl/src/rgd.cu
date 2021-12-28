@@ -117,8 +117,8 @@ __global__ void  kernel_cudaCountOverlaps (
 	if (index_of_particle < device_particles_size){
 		device_particles[index_of_particle].status = ParticleStatus::to_alive;
 		device_particles[index_of_particle].overlap = 0;
-		Pose pose = device_particles[index_of_particle].pose;
-        float sum_good_hits = 0.0f;
+		const Pose& pose = device_particles[index_of_particle].pose;
+        uint32_t sum_good_hits{0};
 #ifdef ROTATION_TB
         Eigen::Affine3d m = Eigen::Affine3d::Identity();
 
@@ -154,7 +154,7 @@ __global__ void  kernel_cudaCountOverlaps (
 		double cz = cos(pose.o.z_angle_rad);
 #endif
 #ifdef ROTATION_SE3
-        const Eigen::Vector3d t = pose.p;
+        const Eigen::Vector3d& t = pose.p;
         const Eigen::Matrix3d& r= pose.o;
 #endif
 		for(size_t i = 0 ; i < points_size; i++){

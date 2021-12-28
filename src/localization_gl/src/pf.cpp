@@ -49,21 +49,36 @@ void initialize_host_device_data(HostDeviceData& data)
 	data.number_of_replicated_best_particles_motion_model = 100;
 	data.number_of_replicatations_motion_model = 100;
 
-	for(size_t i = 0 ; i < 10000000; i++){
-		Pose pose;
-		const float update_x = (((float(rand()%1000000))/1000000.0f) - 0.5) * 200.0;
-        const float update_y = (((float(rand()%1000000))/1000000.0f) - 0.5) * 200.0;
-        const float update_angle_rad = (((float(rand()%1000000))/1000000.0f) - 0.5) * 2.0 * M_PI;
-        pose = updatePose(pose, update_x, update_y, 0,0,0,update_angle_rad);
-		Particle p;
-		p.is_tracking = false;
-		p.pose = pose;
-		p.W = data.initial_w_exploration_particles;
-		p.nW = 0;
+	if (data.host_travesability.empty()) {
+        for (size_t i = 0; i < 10000000; i++) {
+            Pose pose;
+            const float update_x = (((float(rand() % 1000000)) / 1000000.0f) - 0.5) * 200.0;
+            const float update_y = (((float(rand() % 1000000)) / 1000000.0f) - 0.5) * 200.0;
+            const float update_angle_rad = (((float(rand() % 1000000)) / 1000000.0f) - 0.5) * 2.0 * M_PI;
+            pose = updatePose(pose, update_x, update_y, 0, 0, 0, update_angle_rad);
+            Particle p;
+            p.is_tracking = false;
+            p.pose = pose;
+            p.W = data.initial_w_exploration_particles;
+            p.nW = 0;
 
-		data.particle_filter_initial_guesses.push_back(p);
+            data.particle_filter_initial_guesses.push_back(p);
+        }
+    }else{
+        for (size_t i = 0; i < data.host_travesability.size(); i++) {
+            Pose pose;
+            const float update_x = data.host_travesability[i].x;
+            const float update_y = data.host_travesability[i].y;
+            const float update_angle_rad = (((float(rand() % 1000000)) / 1000000.0f) - 0.5) * 2.0 * M_PI;
+            pose = updatePose(pose, update_x, update_y, 0, 0, 0, update_angle_rad);
+            Particle p;
+            p.is_tracking = false;
+            p.pose = pose;
+            p.W = data.initial_w_exploration_particles;
+            p.nW = 0;
+            data.particle_filter_initial_guesses.push_back(p);
+        }
 	}
-
 	data.std_update[0] = 0.1;
 	data.std_update[1] = 0.02;
 	data.std_update[2] = 0.0;

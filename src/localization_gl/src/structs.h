@@ -6,7 +6,7 @@
 #include <cuda_runtime.h>
 
 #define ROTATION_SE3
-//#define ROTATION_TB
+//#define ROTATION_TB"crt/math_functions.hpp
 struct Point{
 	double x;
     double y;
@@ -86,7 +86,9 @@ struct Particle{
 
 struct HostDeviceData{
 	std::vector<Point> host_map;
-	Point *device_map;
+    std::vector<Point> host_travesability;
+
+    Point *device_map;
 	size_t device_map_size;
 
 	std::vector<char> host_occupancy_map;
