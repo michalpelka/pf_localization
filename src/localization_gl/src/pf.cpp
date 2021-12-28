@@ -109,6 +109,7 @@ void compute_occupancy(const std::vector<Point> &host_points,	const Grid3DParams
 
 Pose get_pose(const Eigen::Affine3d& _m)
 {
+#ifdef ROTATION_TB
     Pose pose;
     /*Eigen::Vector3d ea = _m.rotation().eulerAngles(0, 1, 2);
 
@@ -154,8 +155,46 @@ Pose get_pose(const Eigen::Affine3d& _m)
 
 
     return pose;
+#endif
+#ifdef ROTATION_SE3
+    Pose pose;
+    pose.p = _m.matrix().block<3,1>(0,3);
+    pose.o = _m.matrix().block<3,3>(0,0);
+    return pose;
+#endif
 }
 Pose updatePose(const Pose& _p, double x, double y, double z, double ox,double oy, double oz){
+
+#ifdef ROTATION_TB
+    Eigen::Affine3d m = Eigen::Affine3d::Identity();
+
+    const double sx = sin(ox);
+    const double cx = cos(ox);
+    const double sy = sin(oy);
+    const double cy = cos(oy);
+    const double sz = sin(oz);
+    const double cz = cos(oz);
+
+    m(0,0) = cy * cz;
+    m(1,0) = cz * sx * sy + cx * sz;
+    m(2,0) = -cx * cz * sy + sx * sz;
+
+    m(0,1) = -cy * sz;
+    m(1,1) = cx * cz - sx * sy * sz;
+    m(2,1) = cz * sx + cx * sy * sz;
+
+    m(0,2) = sy;
+    m(1,2) = -cy * sx;
+    m(2,2) = cx * cy;
+
+    m(0,3) = x;
+    m(1,3) = y;
+    m(2,3) = z;
+    Eigen::Affine3d m2 = get_matrix(_p);
+    return get_pose(m2*m);
+
+#endif
+#ifdef ROTATION_TB_OLD
     Pose _rp;
     _rp.p.x= _p.p.x +x ;
     _rp.p.y= _p.p.y +y ;
@@ -165,10 +204,40 @@ Pose updatePose(const Pose& _p, double x, double y, double z, double ox,double o
     _rp.o.y_angle_rad += _p.o.y_angle_rad + oy;
     _rp.o.z_angle_rad += _p.o.z_angle_rad + oz;
     return _rp;
+#endif
+#ifdef ROTATION_SE3
+    Eigen::Affine3d m = Eigen::Affine3d::Identity();
+
+    const double sx = sin(ox);
+    const double cx = cos(ox);
+    const double sy = sin(oy);
+    const double cy = cos(oy);
+    const double sz = sin(oz);
+    const double cz = cos(oz);
+
+    m(0,0) = cy * cz;
+    m(1,0) = cz * sx * sy + cx * sz;
+    m(2,0) = -cx * cz * sy + sx * sz;
+
+    m(0,1) = -cy * sz;
+    m(1,1) = cx * cz - sx * sy * sz;
+    m(2,1) = cz * sx + cx * sy * sz;
+
+    m(0,2) = sy;
+    m(1,2) = -cy * sx;
+    m(2,2) = cx * cy;
+
+    m(0,3) = x;
+    m(1,3) = y;
+    m(2,3) = z;
+    Eigen::Affine3d m2 = get_matrix(_p);
+    return get_pose(m2*m);
+#endif
 }
 
 Eigen::Affine3d get_matrix(const Pose& _p)
 {
+#ifdef ROTATION_TB
     Eigen::Affine3d m = Eigen::Affine3d::Identity();
 
     double sx = sin(_p.o.x_angle_rad);
@@ -196,6 +265,13 @@ Eigen::Affine3d get_matrix(const Pose& _p)
     m(2,3) = _p.p.z;
 
     return m;
+#endif
+#ifdef ROTATION_SE3
+    Eigen::Affine3d m = Eigen::Affine3d::Identity();
+    m.matrix().block<3,1>(0,3)= _p.p;
+    m.matrix().block<3,3>(0,0) = _p.o;
+    return m;
+#endif
 }
 
 void initial_step(HostDeviceData& data){
@@ -205,7 +281,6 @@ void initial_step(HostDeviceData& data){
 	for (size_t i = 0; i < data.max_particles; i++)
 	{
 		int index = random_index(gen_initial_guesses);
-
 		Particle p;
 		p.is_tracking = false;
 		p.W = 0;
@@ -260,6 +335,7 @@ void particle_filter_step(HostDeviceData& data, const Pose& pose_update, const s
 	auto end = std::chrono::steady_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end-start;
 	printf("time: %-10f\n",elapsed_seconds.count());
+	data.step_time = elapsed_seconds.count();
 }
 
 void update_poses(HostDeviceData& data, const Pose& pose_update)

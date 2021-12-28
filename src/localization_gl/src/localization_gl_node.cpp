@@ -40,8 +40,6 @@ void mouse(int glut_button, int state, int x, int y);
 void motion(int x, int y);
 bool initGL(int *argc, char **argv);
 
-float imgui_co_size{1.0f};
-bool imgui_draw_co{true};
 
 int gl_main(int argc, char *argv[]){
     initGL(&argc, argv);
@@ -124,18 +122,15 @@ void display() {
         pose_update = get_pose(odometry_increment);
 
     }
-    std::cout << pose_update.p.x <<"\t" << pose_update.p.y <<"\t" << pose_update.o.z_angle_rad << std::endl;
+    //std::cout << pose_update.p.x <<"\t" << pose_update.p.y <<"\t" << pose_update.o.z_angle_rad << std::endl;
 	particle_filter_step(host_device_data, pose_update, points);
     Eigen::Affine3d best_pose;
     if(host_device_data.particles.size()> 0){
 		std::cout << "best pose" << std::endl;
         best_pose = get_matrix(host_device_data.particles[0].pose);
 		std::cout << best_pose.matrix() << std::endl;
-
 		std::cout << "w: " <<host_device_data.particles[0].W << " " << host_device_data.particles[0].nW << std::endl;
 	}
-
-
 
 
     if (!ros::ok()){
@@ -152,21 +147,19 @@ void display() {
     glRotatef(rotate_x, 1.0, 0.0, 0.0);
     glRotatef(rotate_y, 0.0, 0.0, 1.0);
 
-    if (imgui_draw_co) {
-        glBegin(GL_LINES);
-        glColor3f(1.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(imgui_co_size, 0.0f, 0.0f);
+    glBegin(GL_LINES);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glVertex3f(0.0f, 0.0f, 0.0f);
+    glVertex3f(1, 0.0f, 0.0f);
 
-        glColor3f(0.0f, 1.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, imgui_co_size, 0.0f);
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glVertex3f(0.0f, 0.0f, 0.0f);
+    glVertex3f(0.0f, 1, 0.0f);
 
-        glColor3f(0.0f, 0.0f, 1.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, imgui_co_size);
-        glEnd();
-    }
+    glColor3f(0.0f, 0.0f, 1.0f);
+    glVertex3f(0.0f, 0.0f, 0.0f);
+    glVertex3f(0.0f, 0.0f, 1);
+    glEnd();
 
     glPointSize(10);
     glColor3f(0.6, 1, 0.1);
@@ -183,11 +176,20 @@ void display() {
 
     glColor3f(0.7,0.7,0.7);
     glBegin(GL_POINTS);
+#ifdef ROTATION_TB
     for(size_t i = 0 ; i < host_device_data.particles.size(); i++){
     	glVertex3f(host_device_data.particles[i].pose.p.x,
     			host_device_data.particles[i].pose.p.y,
     			host_device_data.particles[i].pose.p.z);
     }
+#endif
+#ifdef ROTATION_SE3
+    for(size_t i = 0 ; i < host_device_data.particles.size(); i++){
+        glVertex3f(host_device_data.particles[i].pose.p.x(),
+                   host_device_data.particles[i].pose.p.y(),
+                   host_device_data.particles[i].pose.p.z());
+    }
+#endif
     glEnd();
 
     glBegin(GL_POINTS);
@@ -202,9 +204,9 @@ void display() {
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
     ImGui::Begin("Demo Window1");
-    ImGui::Text("Text");
-    ImGui::SliderFloat("co_size", &imgui_co_size, 0.1f, 10.0f, "co_size: %.0f" );
-    ImGui::Checkbox("co_draw", &imgui_draw_co);
+    ImGui::Text("Elapsed %.3f", host_device_data.step_time);
+
+
     if(ImGui::Button("foo"))
     {
     	std::vector<Particle> exploration_particles = choose_random_exploration_particles(host_device_data);

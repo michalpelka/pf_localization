@@ -35,7 +35,7 @@ if(CUDA_FOUND)
     message("CUDA_cusolver_LIBRARY: ${CUDA_cusolver_LIBRARY}")
 endif()
 
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ;-gencode arch=compute_53,code=sm_53 ;-gencode arch=compute_61,code=sm_61;-gencode arch=compute_75,code=sm_75; -Xptxas -v;--expt-extended-lambda;-std=c++14)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ;-gencode arch=compute_53,code=sm_53 ;-gencode arch=compute_61,code=sm_61;-gencode arch=compute_75,code=sm_75; -Xptxas -v;--expt-extended-lambda;-std=c++14;--expt-relaxed-constexpr)
 
 include_directories(3rd/imgui 3rd/imgui/backends)
 set(ImGui_Glut_src 3rd/imgui/imgui.cpp 3rd/imgui/imgui_demo.cpp 3rd/imgui/imgui_draw.cpp 3rd/imgui/imgui_widgets.cpp

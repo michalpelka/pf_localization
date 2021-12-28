@@ -2,12 +2,15 @@
 #define _STRUCTS_H_
 
 #include <vector>
+#include <Eigen/Eigen>
 #include <cuda_runtime.h>
 
+#define ROTATION_SE3
+//#define ROTATION_TB
 struct Point{
-	float x;
-	float y;
-	float z;
+	double x;
+    double y;
+    double z;
 	char label;
 };
 
@@ -59,9 +62,17 @@ struct Orientation
 
 struct Pose
 {
+#ifdef ROTATION_TB
 	Position p;
 	Orientation o;
 	Pose(){p.x = p.y = p.z = o.x_angle_rad = o.y_angle_rad = o.z_angle_rad = 0.0;};
+#endif
+#ifdef ROTATION_SE3
+    Eigen::Vector3d p;
+    Eigen::Matrix3d o;
+    Pose():p{0,0,0},o{Eigen::Matrix3d::Identity()}{}
+#endif
+
 };
 
 struct Particle{
@@ -111,6 +122,7 @@ struct HostDeviceData{
 		cudaFree(device_map);
 		cudaFree(device_occupancy_map);
 	}
+	float step_time;
 };
 
 
