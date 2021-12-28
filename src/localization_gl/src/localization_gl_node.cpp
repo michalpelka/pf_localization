@@ -47,8 +47,6 @@ void mouse(int glut_button, int state, int x, int y);
 void motion(int x, int y);
 bool initGL(int *argc, char **argv);
 
-float imgui_co_size{1.0f};
-bool imgui_draw_co{true};
 
 int gl_main(int argc, char *argv[]){
     initGL(&argc, argv);
@@ -82,10 +80,11 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
 
 void pointcloud_callback_lvx(const livox_ros_driver::CustomMsg::ConstPtr& msg){
     pcl::PointCloud<pcl::PointXYZI> cloud = catoptric_livox::converterLivoxMirror(mirrors, msg);
+    std::cout << "cloud " << cloud.size() << std::endl;
     pcl::transformPointCloud(cloud, cloud, odometry.matrix().cast<float>());
     aggregated_pointcloud_odom.push_back(cloud.makeShared());
 
-    if (aggregated_pointcloud_odom.size()>15){
+    if (aggregated_pointcloud_odom.size()>10){
         aggregated_pointcloud_odom.pop_front();
     }
     Eigen::Affine3f transform(Eigen::Affine3f::Identity());
@@ -138,23 +137,31 @@ void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
 }
 int main (int argc, char *argv[])
 {
+
 	//ToDo data.host_map -> load map from file
 	pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-	pcl::io::loadPCDFile("/media/michal/ext/p7p2_2d_clean.pcd", *map_cloud);
-    //pcl::io::loadPCDFile("/media/michal/ext/skierniewice_2d_clean.pcd", *map_cloud);
+    pcl::io::loadPCDFile("//media/michal/ext/p7p2_2d_clean.pcd", *map_cloud);
 
-    mirrors = catoptric_livox::loadMirrorFromPLY("/home/michal/code/livox_ws/src/test_lustro_hex_mid70.ply");
-
-    Sophus::SE3d intruments_lever_arm;
-    catoptric_livox::loadCFG(mirrors, intruments_lever_arm, "/home/michal/code/livox_ws/src/pf_localization/test_lustro_hex_mid_70_calib.ini");
+    pcl::PointCloud<pcl::PointXYZ>::Ptr map_traversability(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::io::loadPCDFile("//media/michal/ext/p7p2_2d_traversability.pcd", *map_traversability);
 
     host_device_data.host_map.resize(map_cloud->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
                    //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
     		[](const pcl::PointXYZI&p){return Point{p.x,p.y,0, PointType::obstacle };});
 
-
+    if (map_traversability) {
+        host_device_data.host_travesability.resize(map_traversability->size());
+        std::transform(map_traversability->begin(), map_traversability->end(), host_device_data.host_travesability.begin(),
+                //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
+                       [](const pcl::PointXYZ &p) { return Point{p.x, p.y, 0, PointType::obstacle}; });
+    }
 	initialize_host_device_data(host_device_data);
+
+    mirrors = catoptric_livox::loadMirrorFromPLY("/home/michal/code/livox_ws/src/test_lustro_hex_mid70.ply");
+
+    Sophus::SE3d intruments_lever_arm;
+    catoptric_livox::loadCFG(mirrors, intruments_lever_arm, "/home/michal/code/livox_ws/src/pf_localization/test_lustro_hex_mid_70_calib.ini");
 
     map_cloud = nullptr;
     ros::init(argc, argv, "localization_gl");
@@ -185,16 +192,16 @@ void display() {
         pose_update = get_pose(odometry_increment);
 
     }
-    std::cout << pose_update.p.x <<"\t" << pose_update.p.y <<"\t" << pose_update.o.z_angle_rad << std::endl;
+    //std::cout << pose_update.p.x <<"\t" << pose_update.p.y <<"\t" << pose_update.o.z_angle_rad << std::endl;
 	particle_filter_step(host_device_data, pose_update, points);
     Eigen::Affine3d best_pose;
     if(host_device_data.particles.size()> 0){
 		std::cout << "best pose" << std::endl;
         best_pose = get_matrix(host_device_data.particles[0].pose);
 		std::cout << best_pose.matrix() << std::endl;
-
 		std::cout << "w: " <<host_device_data.particles[0].W << " " << host_device_data.particles[0].nW << std::endl;
 	}
+
 
     if (!ros::ok()){
         return;
@@ -210,21 +217,19 @@ void display() {
     glRotatef(rotate_x, 1.0, 0.0, 0.0);
     glRotatef(rotate_y, 0.0, 0.0, 1.0);
 
-    if (imgui_draw_co) {
-        glBegin(GL_LINES);
-        glColor3f(1.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(imgui_co_size, 0.0f, 0.0f);
+    glBegin(GL_LINES);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glVertex3f(0.0f, 0.0f, 0.0f);
+    glVertex3f(1, 0.0f, 0.0f);
 
-        glColor3f(0.0f, 1.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, imgui_co_size, 0.0f);
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glVertex3f(0.0f, 0.0f, 0.0f);
+    glVertex3f(0.0f, 1, 0.0f);
 
-        glColor3f(0.0f, 0.0f, 1.0f);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(0.0f, 0.0f, imgui_co_size);
-        glEnd();
-    }
+    glColor3f(0.0f, 0.0f, 1.0f);
+    glVertex3f(0.0f, 0.0f, 0.0f);
+    glVertex3f(0.0f, 0.0f, 1);
+    glEnd();
 
     glPointSize(10);
     glColor3f(0.6, 1, 0.1);
@@ -241,11 +246,20 @@ void display() {
 
     glColor3f(0.7,0.7,0.7);
     glBegin(GL_POINTS);
+#ifdef ROTATION_TB
     for(size_t i = 0 ; i < host_device_data.particles.size(); i++){
     	glVertex3f(host_device_data.particles[i].pose.p.x,
     			host_device_data.particles[i].pose.p.y,
     			host_device_data.particles[i].pose.p.z);
     }
+#endif
+#ifdef ROTATION_SE3
+    for(size_t i = 0 ; i < host_device_data.particles.size(); i++){
+        glVertex3f(host_device_data.particles[i].pose.p.x(),
+                   host_device_data.particles[i].pose.p.y(),
+                   host_device_data.particles[i].pose.p.z());
+    }
+#endif
     glEnd();
 
     glBegin(GL_POINTS);
@@ -260,15 +274,17 @@ void display() {
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGLUT_NewFrame();
     ImGui::Begin("Demo Window1");
-    ImGui::Text("Text");
-    ImGui::SliderFloat("co_size", &imgui_co_size, 0.1f, 10.0f, "co_size: %.0f" );
-    ImGui::Checkbox("co_draw", &imgui_draw_co);
-    if(ImGui::Button("foo"))
+    ImGui::Text("Elapsed %.3f", host_device_data.step_time);
+
+
+    if(ImGui::Button("reset"))
     {
         host_device_data.particles.clear();
     	std::vector<Particle> exploration_particles = choose_random_exploration_particles(host_device_data);
+        host_device_data.particles.clear();
     	host_device_data.particles.insert(host_device_data.particles.end(), exploration_particles.begin(), exploration_particles.end());
 
+        std::cout << "bar\n";
     }
 
     ImGui::End();
