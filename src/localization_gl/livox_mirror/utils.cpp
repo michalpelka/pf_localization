@@ -100,8 +100,8 @@ bool catoptric_livox::Mirror::checkIfRayIntersectMirror(const Eigen::Vector3d& o
     //double radius = std::sqrt(dir.y()*dir.y()+dir.z()+dir.z());
     // project on plane
     Eigen::Vector3d dirn = dir/dir.norm();
-    if (dirn.x() > std::cos(min_angle*M_PI/180.0)) return false;
-    if (dirn.x() < std::cos(max_angle*M_PI/180.0)) return false;
+//    if (dirn.x() > std::cos(min_angle*M_PI/180.0)) return false;
+//    if (dirn.x() < std::cos(max_angle*M_PI/180.0)) return false;
 //
 //    double bearing = std::atan2(dirn.y(), dirn.z());
 //
@@ -197,6 +197,14 @@ std::vector<catoptric_livox::Mirror> catoptric_livox::loadMirrorFromPLY(const st
 
 
     file_stream.close();
+
+    std::sort(mirrors.begin(), mirrors.end(), [](const catoptric_livox::Mirror &l, const catoptric_livox::Mirror &r){
+        const Eigen::Vector3d tl = l.getCentroid();
+        const Eigen::Vector3d tr = r.getCentroid();
+        double a = 2.0*M_PI*std::atan2(tl.z(),tl.y());
+        double b = 2.0*M_PI*std::atan2(tr.z(),tr.y());
+        return a < b;
+    });
 
     return mirrors;
 }

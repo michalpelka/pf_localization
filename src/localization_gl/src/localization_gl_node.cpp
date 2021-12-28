@@ -10,6 +10,7 @@
 #include "imgui_impl_glut.h"
 #include "imgui_impl_opengl2.h"
 #include <pcl/filters/approximate_voxel_grid.h>
+#include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/common/transforms.h>
 #include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
@@ -84,16 +85,19 @@ void pointcloud_callback_lvx(const livox_ros_driver::CustomMsg::ConstPtr& msg){
     pcl::transformPointCloud(cloud, cloud, odometry.matrix().cast<float>());
     aggregated_pointcloud_odom.push_back(cloud.makeShared());
 
-    if (aggregated_pointcloud_odom.size()>10){
+    if (aggregated_pointcloud_odom.size()>15){
         aggregated_pointcloud_odom.pop_front();
     }
+    Eigen::Affine3f transform(Eigen::Affine3f::Identity());
+    transform.translation().x() = 0.2;
+
 
     Eigen::Affine3f odom_inv = odometry.inverse().cast<float>();
     pcl::PointCloud<pcl::PointXYZI>::Ptr aggregated(new  pcl::PointCloud<pcl::PointXYZI>);
     for (auto &pc : aggregated_pointcloud_odom) {
         for (int i = 0; i < pc->size(); i += 1) {
             pcl::PointXYZI pt;
-            pt.getArray3fMap() = odom_inv* (*pc)[i].getArray3fMap();
+            pt.getArray3fMap() = odom_inv* transform *(*pc)[i].getArray3fMap();
             pt.intensity = (*pc)[i].intensity;
             aggregated->push_back(pt);
         }
@@ -108,20 +112,18 @@ void pointcloud_callback_lvx(const livox_ros_driver::CustomMsg::ConstPtr& msg){
     pcl::PointCloud<pcl::PointXYZI> filtered_cut_z;
     filtered_cut_z.reserve(filtered.size());
     for(const auto &ref:filtered){
-        if(fabs(ref.z-0.4)< 0.3 && ref.x*ref.x + ref.y*ref.y > 1.5*1.5){
+        if(fabs(ref.z-0.8)< 0.3 && ref.x*ref.x + ref.y*ref.y > 1.0){
             filtered_cut_z.push_back(ref);
         }
     }
-    Eigen::Affine3f transform(Eigen::Affine3f::Identity());
-    transform.translation().x() = 0.2;
 
-    pcl::transformPointCloud(filtered_cut_z, input_data, transform);
-    input_data.header.frame_id ="base_link";
+    input_data = filtered_cut_z;
+    aggregated->header.frame_id ="base_link";
     pcl_conversions::toPCL(ros::Time::now(), input_data.header.stamp);
     if(aggregated_livox.getNumSubscribers()>0){
-        aggregated_livox.publish(input_data);
+        aggregated_livox.publish(aggregated);
     }
-
+    //pcl::io::savePCDFile("/tmp/test_pcd.pcd", *aggregated);
 }
 
 void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
@@ -139,7 +141,12 @@ int main (int argc, char *argv[])
 	//ToDo data.host_map -> load map from file
 	pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>);
 	pcl::io::loadPCDFile("/media/michal/ext/p7p2_2d_clean.pcd", *map_cloud);
-    mirrors = catoptric_livox::loadMirrorFromPLY("/home/michal/code/livox_ws/src/pf_localization/test_lustro_hex_mid70.ply");
+    //pcl::io::loadPCDFile("/media/michal/ext/skierniewice_2d_clean.pcd", *map_cloud);
+
+    mirrors = catoptric_livox::loadMirrorFromPLY("/home/michal/code/livox_ws/src/test_lustro_hex_mid70.ply");
+
+    Sophus::SE3d intruments_lever_arm;
+    catoptric_livox::loadCFG(mirrors, intruments_lever_arm, "/home/michal/code/livox_ws/src/pf_localization/test_lustro_hex_mid_70_calib.ini");
 
     host_device_data.host_map.resize(map_cloud->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
@@ -188,9 +195,6 @@ void display() {
 
 		std::cout << "w: " <<host_device_data.particles[0].W << " " << host_device_data.particles[0].nW << std::endl;
 	}
-
-
-
 
     if (!ros::ok()){
         return;
@@ -261,12 +265,10 @@ void display() {
     ImGui::Checkbox("co_draw", &imgui_draw_co);
     if(ImGui::Button("foo"))
     {
+        host_device_data.particles.clear();
     	std::vector<Particle> exploration_particles = choose_random_exploration_particles(host_device_data);
-
     	host_device_data.particles.insert(host_device_data.particles.end(), exploration_particles.begin(), exploration_particles.end());
 
-
-        std::cout << "bar\n";
     }
 
     ImGui::End();

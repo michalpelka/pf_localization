@@ -26,13 +26,38 @@ pcl::PointCloud<pcl::PointXYZI> catoptric_livox::converterLivoxMirror(const std:
             dir = dir / l;
 //                Eigen::Vector4d plane = catoptric_livox::getPlaneCoefFromSE3(mirrors[mirror_id].getTransformationOptimized());
             Eigen::Vector4d plane = mirrors[mirror_id].getABCDofPlane();
-
             Eigen::Vector4d p = Eigen::Vector4d::Ones();
             p.head(3)= catoptric_livox::getMirroredRay(dir, l, plane);
             pcl::PointXYZI pp;
             pp.getArray4fMap() =m_rot2 * m_rot * p.cast<float>();
-            pp.intensity = livox_p.reflectivity;
-            cloud.push_back(pp);
+            if (mirror_id==4)
+            {
+               const Eigen::Vector4d limit_plane1 {0.187910, -0.966714, 0.173648, -0.544318};
+                const Eigen::Vector4d limit_plane2 {0.143978, 0.740704, 0.656222, -0.640081};
+
+                if(limit_plane1[0]* pp.x + limit_plane1[1] * pp.y + limit_plane1[2]*pp.z + limit_plane1[3] > 0&&
+                   limit_plane2[0]* pp.x + limit_plane2[1] * pp.y + limit_plane2[2]*pp.z + limit_plane2[3] > 0)
+               {
+                   pp.intensity = livox_p.reflectivity;
+                   cloud.push_back(pp);
+               }
+            }
+            if (mirror_id==1)
+            {
+
+
+                const Eigen::Vector4d limit_plane1 {-0.112997, 0.944320, 0.309017, -0.276500};
+                const Eigen::Vector4d limit_plane2 {-0.081522, -0.960370, 0.266541, -0.277109};
+                if(limit_plane1[0]* pp.x + limit_plane1[1] * pp.y + limit_plane1[2]*pp.z + limit_plane1[3] > 0 &&
+                   limit_plane2[0]* pp.x + limit_plane2[1] * pp.y + limit_plane2[2]*pp.z + limit_plane2[3] > 0){
+                    pp.intensity = livox_p.reflectivity;
+                    cloud.push_back(pp);
+                }
+            }
+            if (mirror_id == 5 ||mirror_id == 0 || mirror_id == 3 || mirror_id == 2){
+                pp.intensity = livox_p.reflectivity;
+                cloud.push_back(pp);
+            }
         }
     }
     auto h = msg->header;

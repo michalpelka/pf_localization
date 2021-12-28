@@ -481,7 +481,7 @@ std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data)
 		Particle p;
 		p.is_tracking = false;
 		if(data.particles.size() > 0){
-			p.W = data.particles[0].W;
+			p.W = data.particles[data.particles.size()*0.5].W;
 		}else{
 			p.W = data.initial_w_exploration_particles;
 		}
