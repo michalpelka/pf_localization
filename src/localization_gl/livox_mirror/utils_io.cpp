@@ -9,6 +9,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 
+
 bool catoptric_livox::getDataFromCSV(std::vector<catoptric_livox::DataStream> &data, const std::string & filename)
 {
     std::cout << "opening " << filename << std::endl;

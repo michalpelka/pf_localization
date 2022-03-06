@@ -1,0 +1,32 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "",
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "includePath": [
+        "/home/michal/particle_ws/devel/include/**",
+        "/home/michal/code/livox_ws/devel/include/**",
+        "/home/michal/velodyne_ws/devel/include/**",
+        "/home/michal/mandala_3dws/devel/include/**",
+        "/opt/ros/melodic/include/**",
+        "/home/michal/velodyne_ws/src/encrich2021/m3d_native/m3d_calibration_util_nativ/include/**",
+        "/home/michal/mandala_3dws/src/calibration_backpack/include/**",
+        "/home/michal/velodyne_ws/src/encrich2021/husky/husky_base/include/**",
+        "/home/michal/code/livox_ws/src/livox_mirror/include/**",
+        "/home/michal/code/livox_ws/src/pf_localization/src/localization_gl/include/**",
+        "/home/michal/velodyne_ws/src/encrich2021/m3d_native/m3d_multisensor/include/**",
+        "/home/michal/particle_ws/src/BonExell/nask_bringup/include/**",
+        "/home/michal/particle_ws/src/BonExell/particle_filter_cuda/include/**",
+        "/home/michal/particle_ws/src/BonExell/robot_control/include/**",
+        "/home/michal/mandala_3dws/src/velodyne/velodyne_driver/include/**",
+        "/home/michal/mandala_3dws/src/velodyne/velodyne_laserscan/include/**",
+        "/home/michal/mandala_3dws/src/velodyne/velodyne_pcl/include/**",
+        "/home/michal/mandala_3dws/src/velodyne/velodyne_pointcloud/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS"
+    }
+  ]
+}

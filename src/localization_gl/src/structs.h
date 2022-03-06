@@ -14,9 +14,15 @@ struct Point{
 	char label;
 };
 
+struct PointBucket{
+    Eigen::Vector3f p;
+    uint32_t index_of_bucket;
+};
+
 enum PointType{
 	not_initialised,
-	obstacle
+	obstacle,
+	ground
 };
 
 struct Grid3DParams{
@@ -76,9 +82,9 @@ struct Pose
 };
 
 struct Particle{
-	float W;
-	float nW;
-	float overlap;
+	double W;
+    double nW;
+    double overlap;
 	Pose pose;
 	char status;
 	bool is_tracking;
@@ -125,6 +131,20 @@ struct HostDeviceData{
 		cudaFree(device_occupancy_map);
 	}
 	float step_time;
+	int resampling_scheme=0;
+};
+
+struct GridParameters2D_XY {
+    float bounding_box_min_X;
+    float bounding_box_min_Y;
+    float bounding_box_max_X;
+    float bounding_box_max_Y;
+    float bounding_box_extension;
+    int number_of_buckets_X;
+    int number_of_buckets_Y;
+    long long unsigned int number_of_buckets;
+    float resolution_X;
+    float resolution_Y;
 };
 
 

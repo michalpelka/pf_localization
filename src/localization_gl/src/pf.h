@@ -3,6 +3,8 @@
 
 #include <Eigen/Eigen>
 #include "structs.h"
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
 
 void initialize_host_device_data(HostDeviceData& data);
 void compute_occupancy(const std::vector<Point> &host_points,  const Grid3DParams& params, std::vector<char> &host_occupancy_map);
@@ -20,6 +22,13 @@ void update_propability(HostDeviceData& data);
 void resample(HostDeviceData& data);
 std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data);
 std::vector<Particle> get_motion_model_particles(HostDeviceData& data);
+
+
+
+
+void grid_calculate_params_xy(std::vector<PointBucket>& point_cloud, GridParameters2D_XY &in_out_params);
+void reindex_xy(std::vector<PointBucket>&  point_cloud, GridParameters2D_XY &in_out_params) ;
+pcl::PointCloud<pcl::PointXYZI> get_ground_points(pcl::PointCloud<pcl::PointXYZI>::Ptr livox_stream);
 
 
 #endif

@@ -38,7 +38,7 @@ endif()
 
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ;-gencode arch=compute_53,code=sm_53 ;-gencode arch=compute_61,code=sm_61;-gencode arch=compute_75,code=sm_75; -Xptxas -v;--expt-extended-lambda;-std=c++14;--expt-relaxed-constexpr)
 
-include_directories(3rd/imgui 3rd/imgui/backends)
+include_directories(3rd/imgui 3rd/imgui/backends include)
 set(ImGui_Glut_src 3rd/imgui/imgui.cpp 3rd/imgui/imgui_demo.cpp 3rd/imgui/imgui_draw.cpp 3rd/imgui/imgui_widgets.cpp
         3rd/imgui/imgui_tables.cpp
         3rd/imgui/backends/imgui_impl_glut.cpp 3rd/imgui/backends/imgui_impl_opengl2.cpp)
@@ -170,6 +170,9 @@ include_directories(
 #add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src})
 
 cuda_add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src} src/pf.cpp src/rgd.cu src/cuda_exception.cpp)
+cuda_add_executable(test_trajectory src/test_trajectory.cpp ${ImGui_Glut_src} src/pf.cpp src/rgd.cu src/cuda_exception.cpp)
+cuda_add_executable(test_cov src/test_cov.cpp ${ImGui_Glut_src} src/pf.cpp src/rgd.cu src/cuda_exception.cpp)
+
 
 
 ## Rename C++ executable without prefix
@@ -187,6 +190,13 @@ cuda_add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Gl
    ${catkin_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_glut_LIBRARY} livox_mirror
  )
 
+
+target_link_libraries(test_trajectory
+        ${catkin_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_glut_LIBRARY} livox_mirror
+        )
+target_link_libraries(test_cov
+        ${catkin_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_glut_LIBRARY} livox_mirror
+        )
 #############
 ## Install ##
 #############

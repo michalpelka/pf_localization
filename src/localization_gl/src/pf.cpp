@@ -17,8 +17,8 @@ void initialize_host_device_data(HostDeviceData& data)
 	cudaMemcpy(data.device_map, data.host_map.data(), sizeof(Point)*data.host_map.size(), cudaMemcpyHostToDevice);
 	data.device_map_size = data.host_map.size();
 
-	data.map_grid3Dparams.resolution_X = 0.2;
-	data.map_grid3Dparams.resolution_Y = 0.2;
+	data.map_grid3Dparams.resolution_X = 0.25;
+	data.map_grid3Dparams.resolution_Y = 0.25;
 	data.map_grid3Dparams.resolution_Z = 1000.0;
 	data.map_grid3Dparams.bounding_box_extension = 1;
 
@@ -40,7 +40,7 @@ void initialize_host_device_data(HostDeviceData& data)
 	//data.initial_w = -0.1;
 	data.initial_w_exploration_particles = -2.0;
 
-	data.max_particles = 100000;
+	data.max_particles = 15000;
 	data.min_dump_propability_no_observations = -1000000.0;
 	data.min_dump_propability_tracking = -10.0;
 	data.min_dump_propability = -10.0;
@@ -79,12 +79,12 @@ void initialize_host_device_data(HostDeviceData& data)
             data.particle_filter_initial_guesses.push_back(p);
         }
 	}
-	data.std_update[0] = 0.1;
+	data.std_update[0] = 0.05;
 	data.std_update[1] = 0.02;
 	data.std_update[2] = 0.0;
 	data.std_update[3] = 0.0;
 	data.std_update[4] = 0.0;
-	data.std_update[5] = 2.0 * M_PI/180.0;
+	data.std_update[5] = 0.25 * M_PI/180.0;
 
 	data.std_motion_model_x = 0.5;
 	data.std_motion_model_y = 0.1;
@@ -314,6 +314,8 @@ void particle_filter_step(HostDeviceData& data, const Pose& pose_update, const s
 
 	if(data.particle_filter_state == ParticleFilterState::initial){
 		initial_step(data);
+        std::vector<Particle> exploration_particles = choose_random_exploration_particles(data);
+        data.particles.insert(data.particles.end(), exploration_particles.begin(), exploration_particles.end());
 	}else if(data.particle_filter_state == ParticleFilterState::normal){
 
 		/*if(data.particles.size() < 1000){
@@ -516,9 +518,9 @@ void resample(HostDeviceData& data)
 	double lmax = data.particles[0].W;
 	for(size_t i = 1; i < data.particles.size(); i++)
 	{
-		if(data.particles[i].W > lmax)lmax = data.particles[i].W;
+        lmax = std::max( data.particles[i].W, lmax);
 	}
-
+//
 	double gain = 1.0f;
 	double sum = 0.0f;
 	for(size_t i = 0; i < data.particles.size(); i++)
@@ -532,45 +534,61 @@ void resample(HostDeviceData& data)
 		data.particles[i].nW /= sum;
 	}
 
-	for(size_t i = 0; i < data.particles.size(); i++)
-	{
-		if(data.particles[i].nW>max_weight)
-			max_weight=data.particles[i].nW;
-	}
-
 	// Resample
-	std::sort(data.particles.begin(), data.particles.end(), compareParticle_nW);
+    std::vector<Particle> new_particles;
+    if (data.resampling_scheme == 1){
+        // Known as low variance resampling algorithm
+        std::vector<double> cumsum;
+        cumsum.reserve(data.particles.size());
+        double c= 0;
+        for (const auto &p: data.particles){
+            c+=p.nW;
+            cumsum.push_back(c);
+        }
+        const double inv_size = 1.0/data.max_particles;
+        std::uniform_real_distribution<double> uniform_double(0, inv_size);
+        double random = uniform_double(gen_resample_beta);
+        for (int j =0; j < data.max_particles; j++){
+            double U = random + j * inv_size;
+            const auto t = std::upper_bound(cumsum.begin(),cumsum.end(), U);
+            if (t != cumsum.end()){
+                int i= std::distance(cumsum.begin(), t);
+                new_particles.push_back(data.particles[i]);
+            }
+        }
+    }
+    if (data.resampling_scheme == 0) {
+        for(size_t i = 0; i < data.particles.size(); i++)
+        {
+            if(data.particles[i].nW>max_weight)
+                max_weight=data.particles[i].nW;
+        }
+        std::sort(data.particles.begin(), data.particles.end(), compareParticle_nW);
+        double beta = 0.0;
+        std::uniform_int_distribution<> uniform_int(0, data.particles.size());
+        int index = uniform_int(gen_resample_index);
 
+        std::uniform_real_distribution<> uniform_double(0.0, 2.0 * max_weight);
 
-	double beta = 0.0;
+        for (size_t i = 0; i < data.max_particles; i++) {
+            beta += uniform_double(gen_resample_beta);
+            while (data.particles[index].nW < beta) {
+                beta -= data.particles[index].nW;
+                index = (index + 1) % data.particles.size();
+            }
+            Particle p;
+            p.status = ParticleStatus::to_alive;
+            p.pose = data.particles[index].pose;
+            p.W = data.particles[index].W;
+            p.nW = data.particles[index].nW;
+            p.overlap = 0;
+            new_particles.push_back(p);
+        }
+    }
 
-	std::uniform_int_distribution<> uniform_int(0, data.particles.size());
-	int index = uniform_int(gen_resample_index);
-
-	std::vector<Particle> new_particles;
-
-	std::uniform_real_distribution<> uniform_double(0.0, 2.0 * max_weight);
-
-	for (size_t i = 0; i < data.max_particles; i++)
-	{
-		beta += uniform_double(gen_resample_beta);
-		while (data.particles[index].nW < beta)
-		{
-			beta -= data.particles[index].nW;
-			index = (index + 1) % data.particles.size();
-		}
-		Particle p;
-		p.status=ParticleStatus::to_alive;
-		p.pose = data.particles[index].pose;
-		p.W = data.particles[index].W;
-		p.nW = data.particles[index].nW;
-		p.overlap = 0;
-		new_particles.push_back(p);
-	}
-
-	data.particles = new_particles;
-
-	std::sort(data.particles.begin(), data.particles.end(), compareParticle_nW);
+	data.particles =  new_particles;
+    std::sort(data.particles.begin(), data.particles.end(), compareParticle_nW);
+//	std::sort(data.particles.begin(), data.particles.end(), compareParticle_nW);
 }
 
 std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data)
@@ -584,7 +602,7 @@ std::vector<Particle> choose_random_exploration_particles(HostDeviceData& data)
 		Particle p;
 		p.is_tracking = false;
 		if(data.particles.size() > 0){
-			p.W = data.particles[data.particles.size()*0.5].W;
+			p.W = data.particles[data.particles.size()*0.9].W ;
 		}else{
 			p.W = data.initial_w_exploration_particles;
 		}
@@ -632,3 +650,92 @@ std::vector<Particle> get_motion_model_particles(HostDeviceData& data)
 	}
 	return particles;
 }
+
+//////////////////////////////////////////////////////////
+
+void grid_calculate_params_xy(std::vector<PointBucket>& point_cloud, GridParameters2D_XY &in_out_params)
+{
+    float min_x = std::numeric_limits<float>::max();
+    float max_x = std::numeric_limits<float>::min();
+
+    float min_y = std::numeric_limits<float>::max();
+    float max_y = std::numeric_limits<float>::min();
+
+
+    for(size_t i = 0 ; i < point_cloud.size(); i++) {
+        const auto p = point_cloud[i].p;
+        max_x = std::max(max_x, p.x());
+        max_y = std::max(max_y, p.y());
+
+        min_x = std::min(min_x, p.x());
+        min_y = std::min(min_y, p.y());
+    }
+    uint32_t number_of_buckets_X=((max_x - min_x)/in_out_params.resolution_X)+1;
+    uint32_t number_of_buckets_Y=((max_y - min_y)/in_out_params.resolution_Y)+1;
+
+    in_out_params.number_of_buckets_X = number_of_buckets_X;
+    in_out_params.number_of_buckets_Y = number_of_buckets_Y;
+    in_out_params.number_of_buckets   = static_cast<uint32_t>(number_of_buckets_X) *
+                                        static_cast<uint32_t>(number_of_buckets_Y);
+
+    in_out_params.bounding_box_max_X = max_x;
+    in_out_params.bounding_box_min_X = min_x;
+    in_out_params.bounding_box_max_Y = max_y;
+    in_out_params.bounding_box_min_Y = min_y;
+}
+void reindex_xy(std::vector<PointBucket>& point_cloud, GridParameters2D_XY &in_out_params)
+{
+    for(size_t i = 0; i < point_cloud.size(); i++){
+        PointBucket & p = point_cloud[i];
+        uint32_t ix = (p.p.x() - in_out_params.bounding_box_min_X) / in_out_params.resolution_X;
+        uint32_t iy = (p.p.y() - in_out_params.bounding_box_min_Y) / in_out_params.resolution_Y;
+        p.index_of_bucket = ix * static_cast<uint32_t>(in_out_params.number_of_buckets_Y) + iy;
+    }
+
+    std::sort(point_cloud.begin(), point_cloud.end(),
+              [] (const PointBucket & a, const PointBucket & b)
+              {
+                  return (a.index_of_bucket == b.index_of_bucket) ? (a.p.z() < b.p.z()) : (a.index_of_bucket < b.index_of_bucket) ;
+              }  );
+}
+
+pcl::PointCloud<pcl::PointXYZI> get_ground_points(pcl::PointCloud<pcl::PointXYZI>::Ptr livox_stream)
+{
+    // move points to internal structure
+    std::vector<PointBucket> point_cloud;
+    point_cloud.resize(livox_stream->size());
+    std::transform(livox_stream->begin(),livox_stream->end(),point_cloud.begin(),
+                   [](const pcl::PointXYZI & p){
+        return PointBucket{p.getVector3fMap(),0};
+    });
+
+    pcl::PointCloud<pcl::PointXYZI> ground_points;
+    ground_points.reserve(livox_stream->size());
+
+    GridParameters2D_XY in_out_params;
+    in_out_params.bounding_box_extension =1;
+    in_out_params.resolution_X = 0.25;
+    in_out_params.resolution_Y =0.25;
+
+    grid_calculate_params_xy(point_cloud, in_out_params);
+
+    reindex_xy(point_cloud, in_out_params);
+
+    if(livox_stream->size() < 2){
+        return ground_points;
+    }
+
+    for(size_t i = 1; i < point_cloud.size(); i++){
+        const PointBucket &a = point_cloud[i-1];
+        const PointBucket &b = point_cloud[i];
+        if(a.index_of_bucket != b.index_of_bucket){
+            if(b.p.x() < in_out_params.bounding_box_max_X && b.p.x() > in_out_params.bounding_box_min_X && b.p.z() < 0 ){
+                pcl::PointXYZI p;
+                p.getArray3fMap() = b.p;
+                ground_points.push_back(p);
+            }
+        }
+    }
+    return ground_points;
+}
+
