@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(localization_gl)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++17)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -172,6 +172,7 @@ include_directories(
 cuda_add_executable(localization_gl_node src/localization_gl_node.cpp ${ImGui_Glut_src} src/pf.cpp src/rgd.cu src/cuda_exception.cpp)
 cuda_add_executable(test_trajectory src/test_trajectory.cpp ${ImGui_Glut_src} src/pf.cpp src/rgd.cu src/cuda_exception.cpp)
 cuda_add_executable(test_cov src/test_cov.cpp ${ImGui_Glut_src} src/pf.cpp src/rgd.cu src/cuda_exception.cpp)
+cuda_add_executable(testFrame src/test.cpp ${ImGui_Glut_src} src/pf.cpp src/rgd.cu src/cuda_exception.cpp)
 
 
 
@@ -196,6 +197,9 @@ target_link_libraries(test_trajectory
         )
 target_link_libraries(test_cov
         ${catkin_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_glut_LIBRARY} livox_mirror
+        )
+target_link_libraries(testFrame
+        ${catkin_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_glut_LIBRARY}
         )
 #############
 ## Install ##

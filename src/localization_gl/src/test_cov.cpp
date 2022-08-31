@@ -22,7 +22,10 @@
 #include "save_mat.h"
 #include "transformations.h"
 #include "point_to_point_source_to_landmark_tait_bryan_wc_jacobian.h"
+#include "point_to_point_source_to_landmark_tait_bryan_cw_jacobian.h"
+
 #include "point_to_point_source_to_landmark_tait_bryan_wc_cov.h"
+
 
 bool imgui_log_trajectory{false};
 const unsigned int window_width = 1920;
@@ -117,7 +120,9 @@ void calculate_ICP_COV(std::vector<PointMeanCov>& data_pi,
     for(size_t i = 0; i < n ; i ++){
         int row = i * 6;
         int col = i * 6;
-
+        Eigen::Vector3d glob_pi = transform * data_pi[i].coords;
+        Eigen::Vector3d dir = model_qi[i].coords - glob_pi;
+        dir = Eigen::Vector3d(std::abs(dir.x()),std::abs(dir.y()),std::abs(dir.z()));
         cov_x(row, col + 0) = data_pi[i].cov(0,0);
         cov_x(row, col + 1) = data_pi[i].cov(0,1);
         cov_x(row, col + 2) = data_pi[i].cov(0,2);
@@ -130,17 +135,17 @@ void calculate_ICP_COV(std::vector<PointMeanCov>& data_pi,
         cov_x(row + 2, col + 1) = data_pi[i].cov(2,1);
         cov_x(row + 2, col + 2) = data_pi[i].cov(2,2);
 
-        cov_x(row + 3, col + 3 + 0) = model_qi[i].cov(0,0);
-        cov_x(row + 3, col + 3 + 1) = model_qi[i].cov(0,1);
-        cov_x(row + 3, col + 3 + 2) = model_qi[i].cov(0,2);
+        cov_x(row + 3, col + 3 + 0) = dir.x();
+        cov_x(row + 3, col + 3 + 1) = 0;
+        cov_x(row + 3, col + 3 + 2) = 0;
 
-        cov_x(row + 4, col + 3 + 0) = model_qi[i].cov(1,0);
-        cov_x(row + 4, col + 3 + 1) = model_qi[i].cov(1,1);
-        cov_x(row + 4, col + 3 + 2) = model_qi[i].cov(1,2);
+        cov_x(row + 4, col + 3 + 0) = 0;
+        cov_x(row + 4, col + 3 + 1) = dir.y();
+        cov_x(row + 4, col + 3 + 2) = 0;
 
-        cov_x(row + 5, col + 3 + 0) = model_qi[i].cov(2,0);
-        cov_x(row + 5, col + 3 + 1) = model_qi[i].cov(2,1);
-        cov_x(row + 5, col + 3 + 2) = model_qi[i].cov(2,2);
+        cov_x(row + 5, col + 3 + 0) = 0;
+        cov_x(row + 5, col + 3 + 1) = 0;
+        cov_x(row + 5, col + 3 + 2) = dir.z();
     }
     ICP_COV =  d2sum_dbeta2.inverse() * d2sum_dbetadx * cov_x * d2sum_dbetadx.transpose() * d2sum_dbeta2.inverse();
 }
@@ -215,9 +220,11 @@ void computeNN()
 
         if ( kdtree.nearestKSearch (pppt, K, pointIdxKNNSearch, pointKNNSquaredDistance) > 0 )
         {
-            const unsigned int j (pointIdxKNNSearch.front());
-            NN n{i,j,  ppt.head<3>(), pp.head<3>(), (*map_cloud)[j].getArray3fMap()};
-            nearest_neighborhood.emplace_back(n);
+            //if (pointKNNSquaredDistance.front() < 0.3) {
+                const unsigned int j(pointIdxKNNSearch.front());
+                NN n{i, j, ppt.head<3>(), pp.head<3>(), (*map_cloud)[j].getArray3fMap()};
+                nearest_neighborhood.emplace_back(n);
+           // }
         }
     }
 }
@@ -230,6 +237,26 @@ int main (int argc, char *argv[])
     pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d_traversability.pcd", *map_traversability);
     pcl::io::loadPCDFile("/home/michal/code/livox_ws/src/pf_localization/test_data/test_wining_particle.pcd", *scan);
     Eigen::Matrix4d m = save_mat_util::loadMat("/home/michal/code/livox_ws/src/pf_localization/test_data/test_wining_particle.txt");
+
+//    const float d = 10;
+//    for (float i =- d; i < d; i++)
+//    {
+//        const float H = 0.1;
+//        map_cloud->push_back(pcl::PointXYZ(i,-d,H));
+//        map_cloud->push_back(pcl::PointXYZ(i,d,H));
+//
+//        map_cloud->push_back(pcl::PointXYZ(-d,i,H));
+//        map_cloud->push_back(pcl::PointXYZ(d,i,H));
+//
+//        scan->push_back(pcl::PointXYZ(i,-d,H));
+//        scan->push_back(pcl::PointXYZ(i,d,H));
+//
+//        //scan->push_back(pcl::PointXYZ(-d,i,H));
+//        //scan->push_back(pcl::PointXYZ(d,i,H));
+//
+//    }
+
+//    Eigen::Matrix4d m = Eigen::Matrix4d::Identity();
     kdtree.setInputCloud (map_cloud);
 
     pose = Sophus::SE3f(m.cast<float>());
@@ -285,7 +312,7 @@ void display() {
         glVertex3f(p.x, p.y, p.z);
     }
     glEnd();
-    glPointSize(1);
+    glPointSize(4);
 
 
 
@@ -311,7 +338,7 @@ void display() {
     }
     glEnd();
     Eigen::Vector3d tt=pose.translation().cast<double>();
-    draw_confusion_ellipse((double)scale*Sigma.block<3,3>(0,0),tt, Eigen::Vector3f(1,1,0));
+    draw_confusion_ellipse((double)scale*covPose,tt, Eigen::Vector3f(1,1,0));
 
     for (const auto &nn : nearest_neighborhood){
             glBegin(GL_LINES);
@@ -333,7 +360,7 @@ void display() {
     }
 
 
-    if(ImGui::Button("icp")) {
+    if(ImGui::Button("icp_wc")) {
         computeNN();
         std::vector<Eigen::Triplet<double>> tripletListA;
         std::vector<Eigen::Triplet<double>> tripletListP;
@@ -366,11 +393,11 @@ void display() {
                                                             p_1.x(),p_1.y(),p_1.z());
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> hessian;
 
-            point_to_point_source_to_landmark_tait_bryan_wc_hessian(hessian,
-                                                           _pose.px,_pose.py,_pose.pz,
-                                                           _pose.om,_pose.fi,_pose.ka,
-                                                            p_1.x(),p_1.y(),p_1.z(),
-                                                            p_l.x(),p_l.y(),p_l.z());
+//            point_to_point_source_to_landmark_tait_bryan_wc_hessian(hessian,
+//                                                           _pose.px,_pose.py,_pose.pz,
+//                                                           _pose.om,_pose.fi,_pose.ka,
+//                                                            p_1.x(),p_1.y(),p_1.z(),
+//                                                            p_l.x(),p_l.y(),p_l.z());
             hessian_sum+=hessian;
             Err(0,i) = delta_x;
             Err(1,i) = delta_y;
@@ -407,6 +434,68 @@ void display() {
             tripletListB.emplace_back(ir + 1, 0,  delta_y);
             tripletListB.emplace_back(ir + 2, 0,  delta_z);
         }
+        {
+            int ir = tripletListB.size();
+            int ic_1 = 0;
+            tripletListA.emplace_back(ir     , ic_1    , 1);
+            tripletListA.emplace_back(ir     , ic_1 + 1, 0);
+            tripletListA.emplace_back(ir     , ic_1 + 2, 0);
+            tripletListA.emplace_back(ir     , ic_1 + 3, 0);
+            tripletListA.emplace_back(ir     , ic_1 + 4, 0);
+            tripletListA.emplace_back(ir     , ic_1 + 5, 0);
+
+            tripletListA.emplace_back(ir+1   , ic_1    , 0);
+            tripletListA.emplace_back(ir+1   , ic_1 + 1, 1);
+            tripletListA.emplace_back(ir+1   , ic_1 + 2, 0);
+            tripletListA.emplace_back(ir+1   , ic_1 + 3, 0);
+            tripletListA.emplace_back(ir+1   , ic_1 + 4, 0);
+            tripletListA.emplace_back(ir+1   , ic_1 + 5, 0);
+
+            tripletListA.emplace_back(ir+2     , ic_1    , 0);
+            tripletListA.emplace_back(ir+2     , ic_1 + 1, 0);
+            tripletListA.emplace_back(ir+2     , ic_1 + 2, 1);
+            tripletListA.emplace_back(ir+2     , ic_1 + 3, 0);
+            tripletListA.emplace_back(ir+2     , ic_1 + 4, 0);
+            tripletListA.emplace_back(ir+2     , ic_1 + 5, 0);
+
+            tripletListA.emplace_back(ir+3     , ic_1    , 0);
+            tripletListA.emplace_back(ir+3     , ic_1 + 1, 0);
+            tripletListA.emplace_back(ir+3     , ic_1 + 2, 0);
+            tripletListA.emplace_back(ir+3     , ic_1 + 3, 1);
+            tripletListA.emplace_back(ir+3     , ic_1 + 4, 0);
+            tripletListA.emplace_back(ir+3     , ic_1 + 5, 0);
+
+            tripletListA.emplace_back(ir+4     , ic_1    , 0);
+            tripletListA.emplace_back(ir+4     , ic_1 + 1, 0);
+            tripletListA.emplace_back(ir+4     , ic_1 + 2, 0);
+            tripletListA.emplace_back(ir+4     , ic_1 + 3, 0);
+            tripletListA.emplace_back(ir+4     , ic_1 + 4, 1);
+            tripletListA.emplace_back(ir+4     , ic_1 + 5, 0);
+
+            tripletListA.emplace_back(ir+5     , ic_1    , 0);
+            tripletListA.emplace_back(ir+5     , ic_1 + 1, 0);
+            tripletListA.emplace_back(ir+5     , ic_1 + 2, 0);
+            tripletListA.emplace_back(ir+5     , ic_1 + 3, 0);
+            tripletListA.emplace_back(ir+5     , ic_1 + 4, 0);
+            tripletListA.emplace_back(ir+5     , ic_1 + 5, 1);
+
+
+            tripletListP.emplace_back(ir    , ir    ,  1e-12);
+            tripletListP.emplace_back(ir + 1, ir + 1,  1e-12);
+            tripletListP.emplace_back(ir + 2, ir + 2,  1e-12);
+            tripletListP.emplace_back(ir + 3, ir + 3,  1e-12);
+            tripletListP.emplace_back(ir + 4, ir + 4,  1e-12);
+            tripletListP.emplace_back(ir + 5, ir + 5,  1e-12);
+
+            tripletListB.emplace_back(ir    , 0,  0.0001);
+            tripletListB.emplace_back(ir + 1, 0,  0);
+            tripletListB.emplace_back(ir + 2, 0,  0);
+            tripletListB.emplace_back(ir + 3, 0,  0);
+            tripletListB.emplace_back(ir + 4, 0,  0);
+            tripletListB.emplace_back(ir + 5, 0,  0);
+
+        }
+
 
         Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
         Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
@@ -421,8 +510,8 @@ void display() {
 
         {
             Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
-//            AtPA = (AtP) * matA;
-            AtPA = hessian_sum.sparseView();
+            AtPA = (AtP) * matA;
+//            AtPA = hessian_sum.sparseView();
             AtPB = (AtP) * matB;
         }
 
@@ -436,16 +525,20 @@ void display() {
         Eigen::SparseMatrix<double> x = solver.solve(AtPB);
 
         std::vector<double> h_x;
-
+        std::cout << "h_x : " ;
         for (int k=0; k<x.outerSize(); ++k){
             for (Eigen::SparseMatrix<double>::InnerIterator it(x,k); it; ++it){
                 h_x.push_back(it.value());
+                std::cout << it.value() << " ";
             }
         }
+        std::cout << std::endl;
 
 
         // From cannonical form to moment form
         auto J = (matB.transpose()*matB).toDense();
+        std::cout <<"  ->     J " << J << std::endl;
+
         std::cout << "J " << J.rows() << " " << J.cols() << std::endl;
         Sigma =  2.0*(J(0,0))/(nearest_neighborhood.size()-3)*Eigen::Matrix<double,6,6>(AtPA).inverse();
         // marginalize out only translation
@@ -454,6 +547,7 @@ void display() {
 
         std::cout << "covPose " << std::endl;
         std::cout << covPose << std::endl;
+
 
         _pose.px += h_x[0];
         _pose.py += h_x[1];
@@ -464,6 +558,139 @@ void display() {
 
         pose = Sophus::SE3f(affine_matrix_from_pose_tait_bryan(_pose).matrix().cast<float>());
     }
+
+
+//    if(ImGui::Button("icp_cw")) {
+//        computeNN();
+//        std::vector<Eigen::Triplet<double>> tripletListA;
+//        std::vector<Eigen::Triplet<double>> tripletListP;
+//        std::vector<Eigen::Triplet<double>> tripletListB;
+//
+//        TaitBryanPose _pose = pose_tait_bryan_from_affine_matrix(Eigen::Affine3d(pose.inverse().matrix().cast<double>()));
+//
+//        Eigen::MatrixXd Err(3,nearest_neighborhood.size());
+//        Eigen::Matrix<double, 6, 6, Eigen::RowMajor> hessian_sum;
+//        hessian_sum.setZero();
+//        for (int i = 0; i < nearest_neighborhood.size(); i++)
+//        {
+//            const auto & nn = nearest_neighborhood[i];
+//            // todo check!!
+//            Eigen::Vector3d p_1 = nn.psL.cast<double>();
+//            Eigen::Vector3d p_l = nn.pm.cast<double>();
+//
+//            double delta_x;
+//            double delta_y;
+//            double delta_z;
+//            point_to_point_source_to_landmark_tait_bryan_cw(delta_x, delta_y, delta_z,
+//                                                            _pose.px,_pose.py,_pose.pz,
+//                                                            _pose.om,_pose.fi,_pose.ka,
+//                                                            p_1.x(),p_1.y(),p_1.z(),
+//                                                            p_l.x(),p_l.y(),p_l.z());
+//            Eigen::Matrix<double, 3, 6, Eigen::RowMajor> jacobian;
+//            point_to_point_source_to_landmark_tait_bryan_cw_jacobian(jacobian,
+//                                                                     _pose.px,_pose.py,_pose.pz,
+//                                                                     _pose.om,_pose.fi,_pose.ka,
+//                                                                     p_1.x(),p_1.y(),p_1.z(),
+//                                                                     p_l.x(),p_l.y(),p_l.z());
+//            Eigen::Matrix<double, 6, 6, Eigen::RowMajor> hessian;
+//
+//            point_to_point_source_to_landmark_tait_bryan_cw_hessian(hessian,
+//                                                                    _pose.px,_pose.py,_pose.pz,
+//                                                                    _pose.om,_pose.fi,_pose.ka,
+//                                                                    p_1.x(),p_1.y(),p_1.z(),
+//                                                                    p_l.x(),p_l.y(),p_l.z());
+//            hessian_sum+=hessian;
+//            Err(0,i) = delta_x;
+//            Err(1,i) = delta_y;
+//            Err(2,i) = delta_z;
+//
+//            int ir = tripletListB.size();
+//            int ic_1 = 0;
+//            tripletListA.emplace_back(ir     , ic_1    , -jacobian(0,0));
+//            tripletListA.emplace_back(ir     , ic_1 + 1, -jacobian(0,1));
+//            tripletListA.emplace_back(ir     , ic_1 + 2, -jacobian(0,2));
+//            tripletListA.emplace_back(ir     , ic_1 + 3, -jacobian(0,3));
+//            tripletListA.emplace_back(ir     , ic_1 + 4, -jacobian(0,4));
+//            tripletListA.emplace_back(ir     , ic_1 + 5, -jacobian(0,5));
+//
+//            tripletListA.emplace_back(ir + 1 , ic_1    , -jacobian(1,0));
+//            tripletListA.emplace_back(ir + 1 , ic_1 + 1, -jacobian(1,1));
+//            tripletListA.emplace_back(ir + 1 , ic_1 + 2, -jacobian(1,2));
+//            tripletListA.emplace_back(ir + 1 , ic_1 + 3, -jacobian(1,3));
+//            tripletListA.emplace_back(ir + 1 , ic_1 + 4, -jacobian(1,4));
+//            tripletListA.emplace_back(ir + 1 , ic_1 + 5, -jacobian(1,5));
+//
+//            tripletListA.emplace_back(ir + 2 , ic_1    , -jacobian(2,0));
+//            tripletListA.emplace_back(ir + 2 , ic_1 + 1, -jacobian(2,1));
+//            tripletListA.emplace_back(ir + 2 , ic_1 + 2, -jacobian(2,2));
+//            tripletListA.emplace_back(ir + 2 , ic_1 + 3, -jacobian(2,3));
+//            tripletListA.emplace_back(ir + 2 , ic_1 + 4, -jacobian(2,4));
+//            tripletListA.emplace_back(ir + 2 , ic_1 + 5, -jacobian(2,5));
+//
+//            tripletListP.emplace_back(ir    , ir    ,  1);
+//            tripletListP.emplace_back(ir + 1, ir + 1,  1);
+//            tripletListP.emplace_back(ir + 2, ir + 2,  1);
+//
+//            tripletListB.emplace_back(ir    , 0,  delta_x);
+//            tripletListB.emplace_back(ir + 1, 0,  delta_y);
+//            tripletListB.emplace_back(ir + 2, 0,  delta_z);
+//        }
+//
+//        Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
+//        Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
+//        Eigen::SparseMatrix<double> matB(tripletListB.size(), 1);
+//
+//        matA.setFromTriplets(tripletListA.begin(), tripletListA.end());
+//        matP.setFromTriplets(tripletListP.begin(), tripletListP.end());
+//        matB.setFromTriplets(tripletListB.begin(), tripletListB.end());
+//
+//        Eigen::SparseMatrix<double> AtPA(6, 6);
+//        Eigen::SparseMatrix<double> AtPB(6, 1);
+//
+//        {
+//            Eigen::SparseMatrix<double> AtP = matA.transpose() * matP;
+//            AtPA = (AtP) * matA;
+////            AtPA = hessian_sum.sparseView();
+//            AtPB = (AtP) * matB;
+//        }
+//
+//        std::cout << "AtPA.size: " << AtPA.size() << std::endl;
+//        std::cout << "AtPB.size: " << AtPB.size() << std::endl;
+//
+//        std::cout << "start solving AtPA=AtPB" << std::endl;
+//        Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> solver(AtPA);
+//
+//        std::cout << "x = solver.solve(AtPB)" << std::endl;
+//        Eigen::SparseMatrix<double> x = solver.solve(AtPB);
+//
+//        std::vector<double> h_x;
+//
+//        for (int k=0; k<x.outerSize(); ++k){
+//            for (Eigen::SparseMatrix<double>::InnerIterator it(x,k); it; ++it){
+//                h_x.push_back(it.value());
+//            }
+//        }
+//
+//        // From cannonical form to moment form
+//        auto J = (matB.transpose()*matB).toDense();
+//        std::cout << "J " << J.rows() << " " << J.cols() << std::endl;
+//        Sigma =  2.0*(J(0,0))/(nearest_neighborhood.size()-3)*Eigen::Matrix<double,6,6>(AtPA).inverse();
+//        // marginalize out only translation
+//        const Eigen::Matrix3d R= pose.rotationMatrix().cast<double>();
+//        covPose = Sigma.block<3,3>(0,0) ;
+//
+//        std::cout << "covPose " << std::endl;
+//        std::cout << covPose << std::endl;
+//
+//        _pose.px += h_x[0];
+//        _pose.py += h_x[1];
+//        _pose.pz += h_x[2];
+//        _pose.om += h_x[3];
+//        _pose.fi += h_x[4];
+//        _pose.ka += h_x[5];
+//
+//        pose = Sophus::SE3f(affine_matrix_from_pose_tait_bryan(_pose).matrix().cast<float>()).inverse();
+//    }
     if(ImGui::Button("implicit")) {
         computeNN();
         std::vector<Eigen::Triplet<double>> tripletListA;
@@ -538,6 +765,8 @@ void display() {
             tripletListB.emplace_back(ir + 1, 0,  delta_y);
             tripletListB.emplace_back(ir + 2, 0,  delta_z);
         }
+        // add pose
+
 
         Eigen::SparseMatrix<double> matA(tripletListB.size(), 6);
         Eigen::SparseMatrix<double> matP(tripletListB.size(), tripletListB.size());
@@ -609,6 +838,7 @@ void display() {
         Eigen::MatrixXd ICP_COV;
         calculate_ICP_COV(data_pi, model_qi,Eigen::Affine3d(pose.matrix().cast<double>()), ICP_COV);
         Sigma = ICP_COV;
+        covPose = Sigma.block<3,3>(0,0);
 
     }
     ImGui::InputFloat("scale", &scale);

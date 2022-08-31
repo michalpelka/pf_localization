@@ -392,7 +392,7 @@ void update_poses(HostDeviceData& data, const Pose& pose_update)
 	}
 }
 
-void compute_overlaps(HostDeviceData& data, const std::vector<Point>& points)
+void compute_overlaps(HostDeviceData& data, const std::vector<Point>& points, bool normalize)
 {
 	Point *device_points;
 	cudaMalloc((void **)&device_points, sizeof(Point)*points.size());
@@ -417,7 +417,9 @@ void compute_overlaps(HostDeviceData& data, const std::vector<Point>& points)
 	cudaFree(device_points);
 	cudaFree(device_particles);
 
-	normalize_overlaps(data);
+	if(normalize){
+	    normalize_overlaps(data);
+	}
 }
 
 void normalize_overlaps(HostDeviceData& data){
@@ -739,3 +741,11 @@ pcl::PointCloud<pcl::PointXYZI> get_ground_points(pcl::PointCloud<pcl::PointXYZI
     return ground_points;
 }
 
+Pose MatrixToPose(const Eigen::Matrix4d & mat){
+    Pose p;
+    p.o = mat.topLeftCorner<3,3>();
+    p.p.x() = mat(0,3);
+    p.p.y() = mat(1,3);
+    p.p.z() = mat(2,3);
+    return p;
+}

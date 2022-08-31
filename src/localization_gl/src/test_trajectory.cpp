@@ -73,12 +73,13 @@ std::map<double,Sophus::SE3d> loadTrajectory(const std::string& fn, double off= 
 int main (int argc, char *argv[])
 {
     trajectorygt = loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_gt.txt",0);
+
 //    trajectory2 = loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_filter_calib.txt");
 //    trajectory2 = loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory2/trajectory_velo_100k.txt");
 
 //    trajectory2.push_back(loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_lvx/trajectory_filter_5k.txt"));
-//    trajectory2.push_back(loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_lvx/trajectory_filter_10k.txt"));
-    trajectory2.push_back(loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_lvx/trajectory_filter_50k.txt"));
+    trajectory2.push_back(loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_lvx/trajectory_filter_10k.txt"));
+//    trajectory2.push_back(loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_lvx/trajectory_filter_50k.txt"));
 //    trajectory2.push_back(loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_lvx/trajectory_filter_100k.txt"));
 
 //    trajectory2.push_back(loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory2/trajectory_velo_5k.txt"));
@@ -93,6 +94,32 @@ int main (int argc, char *argv[])
 
 
 //    trajectory2.push_back(loadTrajectory("/media/michal/ext/garaz2/trajectory/trajectory_wheel.txt"));
+
+
+    std::ofstream ofss ("/media/michal/ext/garaz2/trajectory/trajectory_lvx/trajectory_filter_10k_ATE_calib.txt");
+
+    for (int i =0; i < trajectory2.size(); i++)
+    {
+        const auto & trajectory = trajectory2[i];
+
+        for (const auto &p : trajectory){
+            const auto &timestamp = p.first;
+            const auto &tr = p.second;
+            const auto it = trajectorygt.lower_bound(timestamp);
+            const double err = std::abs(it->first - timestamp);
+            if (err < 0.5) {
+
+                auto P = tr;
+                auto Q = it->second;
+                double ate = (Q.inverse() * P).translation().squaredNorm();
+                ofss<<ate<<std::endl;
+//            std::cout << P.matrix() << std::endl;
+//            std::cout << Q.matrix() << std::endl;
+//            std::cout << "=================" << std::endl;
+            }
+        }
+    }
+
 
 
     std::thread gl_th(gl_main, argc, argv);
@@ -195,7 +222,6 @@ void display() {
             }
         }
         double ate = std::sqrt(std::accumulate(ate_f1n.begin(),ate_f1n.end(),0.0)/ate_f1n.size());
-        std::cout << i << " ATE " << ate << std::endl;
     }
 
 

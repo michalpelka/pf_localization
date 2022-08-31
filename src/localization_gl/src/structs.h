@@ -1,3 +1,4 @@
+#pragma once
 #ifndef _STRUCTS_H_
 #define _STRUCTS_H_
 
@@ -6,6 +7,7 @@
 #include <cuda_runtime.h>
 
 #define ROTATION_SE3
+
 //#define ROTATION_TB"crt/math_functions.hpp
 struct Point{
 	double x;
