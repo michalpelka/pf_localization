@@ -36,13 +36,12 @@ if(CUDA_FOUND)
     message("CUDA_cusolver_LIBRARY: ${CUDA_cusolver_LIBRARY}")
 endif()
 
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ;-gencode arch=compute_53,code=sm_53 ;-gencode arch=compute_61,code=sm_61;-gencode arch=compute_75,code=sm_75; -Xptxas -v;--expt-extended-lambda;-std=c++14;--expt-relaxed-constexpr)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ;-gencode arch=compute_52,code=sm_52 ;-gencode arch=compute_61,code=sm_61;-gencode arch=compute_75,code=sm_75; -Xptxas -v;--expt-extended-lambda;-std=c++14;--expt-relaxed-constexpr)
 
 include_directories(3rd/imgui 3rd/imgui/backends include)
 set(ImGui_Glut_src 3rd/imgui/imgui.cpp 3rd/imgui/imgui_demo.cpp 3rd/imgui/imgui_draw.cpp 3rd/imgui/imgui_widgets.cpp
         3rd/imgui/imgui_tables.cpp
         3rd/imgui/backends/imgui_impl_glut.cpp 3rd/imgui/backends/imgui_impl_opengl2.cpp)
-
 
 include_directories(livox_mirror 3rd/Sophus 3rd)
 add_library(livox_mirror livox_mirror/utils.cpp livox_mirror/utils_io.cpp livox_mirror/mirror_converter.cpp)
@@ -187,6 +186,10 @@ cuda_add_executable(testFrame src/test.cpp ${ImGui_Glut_src} src/pf.cpp src/rgd.
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
+
+
+add_dependencies(localization_gl_node livox_ros_driver_generate_messages_cpp)
+
  target_link_libraries(localization_gl_node
    ${catkin_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_glut_LIBRARY} livox_mirror
  )

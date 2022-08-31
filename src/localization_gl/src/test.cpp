@@ -26,12 +26,9 @@
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/common/transforms.h>
 
-
+#include <ros/package.h>
 #include "structs.h"
 #include "pf.h"
-
-#include "mirror_converter.h"
-#include "save_mat.h"
 
 
 bool imgui_log_trajectory{false};
@@ -88,10 +85,11 @@ int main (int argc, char *argv[])
     best_pose = Eigen::Affine3d (m);
 
     //ToDo data.host_map -> load map from file
+    std::string path = ros::package::getPath("localization_gl");
 
-    pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d.pcd", *map_cloud);
-    pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d_traversability.pcd", *map_traversability);
-    pcl::io::loadPCDFile("/home/michal/code/livox_ws/src/pf_localization/src/localization_gl/data/frame_248.pcd", *measurment);
+    pcl::io::loadPCDFile(path+"/data/p7p_cloud_clean_2d.pcd", *map_cloud);
+    pcl::io::loadPCDFile(path+"/data/p7p_cloud_clean_2d_traversability.pcd", *map_traversability);
+    pcl::io::loadPCDFile(path+"/data/frame_248.pcd", *measurment);
     host_device_data.host_map.resize(map_cloud->size()+map_traversability->size());
 
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
