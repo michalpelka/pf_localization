@@ -56,7 +56,7 @@ void motion(int x, int y);
 bool initGL(int *argc, char **argv);
 struct imgui_data{
    int resample_type = 1;
-   int sensor_type= 1;
+   int sensor_type= 0;
 }imgui_data;
 
 int gl_main(int argc, char *argv[]){
@@ -65,13 +65,14 @@ int gl_main(int argc, char *argv[]){
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
     glutMainLoop();
+    return 0;
 }
 
 void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
     if (imgui_data.sensor_type != 0) return;
     Eigen::Affine3f transform(Eigen::Affine3f::Identity());
     transform.translation().x() = 0.2;
-    transform.rotate(Eigen::Quaternionf(0.96593,0,0,-0.25882));
+    //transform.rotate(Eigen::Quaternionf(0.96593,0,0,-0.25882));
     pcl::ApproximateVoxelGrid<pcl::PointXYZI> filter;
     filter.setInputCloud(msg);
     pcl::PointCloud<pcl::PointXYZI> filtered;
@@ -82,7 +83,7 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
     pcl::PointCloud<pcl::PointXYZI> filtered_cut_z;
     filtered_cut_z.reserve(filtered.size());
     for(const auto &ref:filtered){
-    	if(fabs(ref.z)< 0.3){
+    	if(fabs(ref.z)< 0.2){
     		filtered_cut_z.push_back(ref);
     	}
     }
@@ -90,6 +91,8 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
     pcl::transformPointCloud(input_data_floor, input_data_floor, transform);
     input_data_floor.header.frame_id ="base_link";
     pcl::transformPointCloud(filtered_cut_z, input_data_obstacles, transform);
+
+
 }
 
 void pointcloud_callback_lvx(const livox_ros_driver::CustomMsg::ConstPtr& msg){
@@ -163,25 +166,23 @@ int main (int argc, char *argv[])
 
 	//ToDo data.host_map -> load map from file
 
-    pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d.pcd", *map_cloud);
-    pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d_traversability.pcd", *map_traversability);
+//    pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d.pcd", *map_cloud);
+//    pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d_traversability.pcd", *map_traversability);
+
+    pcl::io::loadPCDFile("/media/michal/ext/jacek_ws/src/jackal_simulator/jackal_gazebo/Media/models/map-obstacle.pcd", *map_cloud);
+    pcl::io::loadPCDFile("/media/michal/ext/jacek_ws/src/jackal_simulator/jackal_gazebo/Media/models/map-traversability.pcd", *map_traversability);
 
     host_device_data.host_map.resize(map_cloud->size()+map_traversability->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
                    //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
     		[](const pcl::PointXYZI&p){return Point{p.x,p.y,0, PointType::obstacle };});
 
-    std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin()+map_cloud->size()-1,
+    std::transform(map_traversability->begin(),map_traversability->end(), host_device_data.host_map.begin(),
             //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
-                   [](const pcl::PointXYZI&p){return Point{p.x,p.y,-1, PointType::ground };});
+                   [](const pcl::PointXYZ&p){return Point{p.x,p.y,-1, PointType::ground };});
 
-    if (map_traversability) {
-        host_device_data.host_travesability.resize(map_traversability->size());
-        std::transform(map_traversability->begin(), map_traversability->end(), host_device_data.host_travesability.begin(),
-                //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
-                       [](const pcl::PointXYZ &p) { return Point{p.x, p.y, 0, PointType::obstacle}; });
-    }
 	initialize_host_device_data(host_device_data);
+
 
     mirrors = catoptric_livox::loadMirrorFromPLY("/home/michal/code/livox_ws/src/test_lustro_hex_mid70.ply");
 
@@ -212,6 +213,18 @@ void display() {
         odometry_increment =  last_odometry.inverse()* odometry;
         last_odometry = odometry;
         points.resize(input_data_obstacles.size()+input_data_floor.size());
+
+
+        for (auto &p : input_data_obstacles){
+            Eigen::Vector3f pn = p.getVector3fMap();
+            float len = pn.norm();
+            pn = pn / len;
+            for (float i =0; i < len-1 ; i+=0.5){
+                points.push_back(Point{pn.x()*i,pn.y()*i,pn.z()*i, PointType::ground });
+            }
+            points.push_back(Point{p.x,p.y,p.z, PointType::obstacle });
+        }
+
 
         std::transform(input_data_obstacles.begin(), input_data_obstacles.end(), points.begin(),
                        [](const pcl::PointXYZI&p){return Point{p.x,p.y,0, PointType::obstacle };});
@@ -315,7 +328,12 @@ void display() {
     //ToDo data -> render map from file
     for (const auto &p : host_device_data.host_map)
     {
-        glVertex3f(p.x, p.y,p.z);
+        if (p.label == obstacle) {
+            glColor3f(1.0f, 1.0f, 0.0f);
+        }else{
+            glColor3f(1.0f, 1.0f, 1.0f);
+        }
+        glVertex3f(p.x, p.y, p.z);
     } glEnd();
     ///////////////////////
 

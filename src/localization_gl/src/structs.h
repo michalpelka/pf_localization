@@ -84,7 +84,7 @@ struct Pose
 };
 
 struct Particle{
-	double W;
+	double W;;
     double nW;
     double overlap;
 	Pose pose;

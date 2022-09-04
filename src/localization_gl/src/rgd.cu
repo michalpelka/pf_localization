@@ -103,6 +103,12 @@ cudaError_t cudaCalculateParams3D(
 	return cudaGetLastError();
 }
 
+__device__ uint32_t getIndexBucket(uint32_t ix,uint32_t iy,uint32_t iz, const Grid3DParams& params ){
+    const uint32_t  index_bucket = ix* static_cast<uint32_t >(params.number_of_buckets_Y) *
+                                   static_cast<uint32_t >(params.number_of_buckets_Z) + iy * static_cast<uint32_t>( params.number_of_buckets_Z) + iz;
+    return index_bucket;
+}
+
 __global__ void  kernel_cudaCountOverlaps (
 		Point *device_points,
 		size_t points_size,
@@ -157,6 +163,11 @@ __global__ void  kernel_cudaCountOverlaps (
         const Eigen::Vector3d& t = pose.p;
         const Eigen::Matrix3d& r= pose.o;
 #endif
+
+        if(pose.p.x() < params.bounding_box_min_X || pose.p.x() > params.bounding_box_max_X)return;
+        if(pose.p.y() < params.bounding_box_min_Y || pose.p.y() > params.bounding_box_max_Y)return;
+        if(pose.p.z() < params.bounding_box_min_Z || pose.p.z()> params.bounding_box_max_Z)return;
+
 		for(size_t i = 0 ; i < points_size; i++){
 #ifdef ROTATION_SE3
             const Point& pSourceLocal = device_points[i];
@@ -182,19 +193,16 @@ __global__ void  kernel_cudaCountOverlaps (
 			if(pSourceGlobal.y < params.bounding_box_min_Y || pSourceGlobal.y > params.bounding_box_max_Y)continue;
 			if(pSourceGlobal.z < params.bounding_box_min_Z || pSourceGlobal.z > params.bounding_box_max_Z)continue;
 
-			uint32_t ix = (pSourceGlobal.x - params.bounding_box_min_X) / params.resolution_X;
-            uint32_t iy = (pSourceGlobal.y - params.bounding_box_min_Y) / params.resolution_Y;
-            uint32_t iz = (pSourceGlobal.z - params.bounding_box_min_Z) / params.resolution_Z;
+			const int ix_stop = (pSourceGlobal.x - params.bounding_box_min_X) / params.resolution_X;
+            const int iy_stop = (pSourceGlobal.y - params.bounding_box_min_Y) / params.resolution_Y;
+            const int iz_stop = (pSourceGlobal.z - params.bounding_box_min_Z) / params.resolution_Z;
 
-            uint32_t  index_bucket = ix* static_cast<uint32_t >(params.number_of_buckets_Y) *
-						static_cast<uint32_t >(params.number_of_buckets_Z) + iy * static_cast<uint32_t>( params.number_of_buckets_Z) + iz;
+            const uint32_t  index_bucket =getIndexBucket (ix_stop, iy_stop, iz_stop, params);
 
 			if (index_bucket < params.number_of_buckets){
-				if(occupied[index_bucket] == pSourceLocal.label){
-					//if(pSourceLocal.label == PointType::obstacle){
-						sum_good_hits ++;
-					//}
-				}
+                if(pSourceLocal.label == occupied[index_bucket]  ){
+                    sum_good_hits ++;
+                }
 			}
 		}
 		device_particles[index_of_particle].overlap = sum_good_hits;

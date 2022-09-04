@@ -72,10 +72,75 @@ int gl_main(int argc, char *argv[]){
     glutMainLoop();
 }
 
+void Bresenham3D(int ix_start, int iy_start, int iz_start, int ix_stop, int iy_stop, int iz_stop){
+    int dx = std::abs(ix_stop - ix_start);
+    int dy = std::abs(iy_stop - iy_start);
+    int dz = std::abs(iz_stop - iz_start);
+    int xs= (ix_stop > ix_start) ? 1 : -1;
+    int ys= (iy_stop > iy_start) ? 1 : -1;
+    int zs= (iz_stop > iz_start) ? 1 : -1;
+    if (dx >= dy && dx >= dz){
+        int p1 = 2.0 * dy - dx;
+        int p2 = 2.0 * dz - dx;
+        while (ix_start != ix_stop){
+            ix_start+= xs;
+            if (p1 >= 0){
+                iy_start += ys;
+                p1 -= 2 * dx;
+            }
+            if (p2 >= 0) {
+                iz_start += zs;
+                p2 -= 2 * dx;
+            }
+            p1 += 2 * dy;
+            p2 += 2 * dz;
+            std::cout << ix_start << ", " << iy_start << ", " << iz_start << std::endl;
+        }
+    }
+    else if (dy >= dx && dy >= dz){
+        int p1 = 2 * dx - dy;
+        int p2 = 2 * dz - dy;
+        while (iy_start != iy_stop) {
+            iy_start += ys;
+            if (p1 >= 0) {
+                ix_start += xs;
+                p1 -= 2 * dy;
+            }
+            if (p2 >= 0) {
+                iz_start += zs;
+                p2 -= 2 * dy;
+            }
+            p1 += 2 * dx;
+            p2 += 2 * dz;
+            std::cout << ix_start << ", " << iy_start << ", " << iz_start << std::endl;
+        }
+    }
+    else{
+        int p1 = 2 * dy - dz;
+        int p2 = 2 * dx - dz;
+        while (iz_start != iz_stop) {
+            iz_start += zs;
+            if (p1 >= 0) {
+                iy_start += ys;
+                p1 -= 2 * dz;
+            }
+            if (p2 >= 0) {
+                ix_start += xs;
+                p2 -= 2 * dz;
+            }
+            p1 += 2 * dy;
+            p2 += 2 * dx;
+            std::cout << ix_start << ", " << iy_start << ", " << iz_start << std::endl;
+        }
+    }
+}
 
 int main (int argc, char *argv[])
 {
-
+//
+//    Bresenham3D(-1, 1, 1, 5, 3, -1);
+//
+//    return 0;
     Eigen::Matrix4d m;
     m << 0.960016,  0.279946,         0,    12.329,
         -0.279946,  0.960016,         0,  -16.3503,
@@ -96,9 +161,9 @@ int main (int argc, char *argv[])
             //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
                    [](const pcl::PointXYZI&p){return Point{p.x,p.y,0, PointType::obstacle };});
 
-    std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin()+map_cloud->size()-1,
+    std::transform(map_traversability->begin(),map_traversability->end(), host_device_data.host_map.begin()+map_cloud->size()-1,
             //[](const pcl::PointXYZI&p){return Point{p.x,p.y,p.z, PointType::obstacle };});
-                   [](const pcl::PointXYZI&p){return Point{p.x,p.y,-1, PointType::ground };});
+                   [](const pcl::PointXYZ&p){return Point{p.x,p.y,0, PointType::ground };});
 
     if (map_traversability) {
         host_device_data.host_travesability.resize(map_traversability->size());
@@ -157,6 +222,15 @@ void display() {
 
 
     }
+    // add
+    for (auto &p : *measurment){
+        Eigen::Vector3f pn = p.getVector3fMap();
+        float len = pn.norm();
+        pn = pn / len;
+        for (float i =0; i < len ; i+=0.25){
+            points.push_back(Point{pn.x()*i,pn.y()*i,pn.z()*i, PointType::ground });
+        }
+    }
 
     double timestamp = 0;
     //std::cout << pose_update.p.x <<"\t" << pose_update.p.y <<"\t" << pose_update.o.z_angle_rad << std::endl;
@@ -164,6 +238,7 @@ void display() {
     host_device_data.particles.resize(1);
     host_device_data.particles[0].pose = MatrixToPose(best_pose.matrix());
     compute_overlaps(host_device_data, points, false);
+
     std::cout <<host_device_data.particles[0].overlap << std::endl;
     glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
 
@@ -232,7 +307,12 @@ void display() {
     //ToDo data -> render map from file
     for (const auto &p : host_device_data.host_map)
     {
-        glVertex3f(p.x, p.y,p.z);
+        if (p.label == obstacle) {
+            glColor3f(1.0f, 1.0f, 0.0f);
+        }else{
+            glColor3f(1.0f, 1.0f, 1.0f);
+        }
+        glVertex3f(p.x, p.y, p.z);
     } glEnd();
     ///////////////////////
 
