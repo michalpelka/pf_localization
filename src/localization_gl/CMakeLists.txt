@@ -11,7 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   sensor_msgs
-  livox_ros_driver
+  livox_ros_driver tf2 tf2_ros
 )
 
 
@@ -44,7 +44,7 @@ set(ImGui_Glut_src 3rd/imgui/imgui.cpp 3rd/imgui/imgui_demo.cpp 3rd/imgui/imgui_
         3rd/imgui/backends/imgui_impl_glut.cpp 3rd/imgui/backends/imgui_impl_opengl2.cpp)
 
 include_directories(livox_mirror 3rd/Sophus 3rd)
-add_library(livox_mirror livox_mirror/utils.cpp livox_mirror/utils_io.cpp livox_mirror/mirror_converter.cpp)
+add_library(livox_mirror STATIC livox_mirror/utils.cpp livox_mirror/utils_io.cpp livox_mirror/mirror_converter.cpp)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)

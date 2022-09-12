@@ -21,6 +21,11 @@
 #include "mirror_converter.h"
 #include "save_mat.h"
 
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/TransformStamped.h>
+
+
 std::vector<catoptric_livox::Mirror> mirrors;
 std::deque<pcl::PointCloud<pcl::PointXYZI>::Ptr> aggregated_pointcloud_odom;
 ros::Publisher aggregated_livox;
@@ -41,6 +46,9 @@ pcl::PointCloud<pcl::PointXYZI> input_data_obstacles;
 pcl::PointCloud<pcl::PointXYZI> input_data_floor;
 
 Eigen::Affine3d odometry {Eigen::Affine3d::Identity()};
+Eigen::Affine3d odometry_first {Eigen::Affine3d::Identity()};
+bool odometry_initialized{false};
+
 Eigen::Affine3d last_odometry {Eigen::Affine3d::Identity()};
 double odometry_timestamp;
 Eigen::Affine3d odometry_increment{Eigen::Affine3d::Identity()};
@@ -91,8 +99,9 @@ void pointcloud_callback(const pcl::PointCloud<pcl::PointXYZI>::Ptr  msg){
     pcl::transformPointCloud(input_data_floor, input_data_floor, transform);
     input_data_floor.header.frame_id ="base_link";
     pcl::transformPointCloud(filtered_cut_z, input_data_obstacles, transform);
-
-
+    auto data = *msg;
+    data.header.frame_id = "base_link2";
+    aggregated_livox.publish(data);
 }
 
 void pointcloud_callback_lvx(const livox_ros_driver::CustomMsg::ConstPtr& msg){
@@ -158,6 +167,12 @@ void odometry_callback(const nav_msgs::Odometry::ConstPtr odo)
     transform.translation() = Eigen::Vector3d{odo->pose.pose.position.x,odo->pose.pose.position.y,odo->pose.pose.position.z};
     transform.rotate(Eigen::Quaterniond{odo->pose.pose.orientation.w,odo->pose.pose.orientation.x,
                                         odo->pose.pose.orientation.y,odo->pose.pose.orientation.z});
+    if (!odometry_initialized)
+    {
+        odometry_first = transform;
+        odometry_initialized = true;
+    }
+
     std::lock_guard<std::mutex> lck(mtx_input_data);
     odometry = transform;
 }
@@ -169,8 +184,8 @@ int main (int argc, char *argv[])
 //    pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d.pcd", *map_cloud);
 //    pcl::io::loadPCDFile("/media/michal/ext/garaz2/CAD/p7p_cloud_clean_2d_traversability.pcd", *map_traversability);
 
-    pcl::io::loadPCDFile("/media/michal/ext/jacek_ws/src/jackal_simulator/jackal_gazebo/Media/models/map-obstacle.pcd", *map_cloud);
-    pcl::io::loadPCDFile("/media/michal/ext/jacek_ws/src/jackal_simulator/jackal_gazebo/Media/models/map-traversability.pcd", *map_traversability);
+    pcl::io::loadPCDFile("/media/michal/ext/jacek_ws/src/jackal/jackal_simulator/jackal_gazebo/Media/models/map-obstacle.pcd", *map_cloud);
+    pcl::io::loadPCDFile("/media/michal/ext/jacek_ws/src/jackal/jackal_simulator/jackal_gazebo/Media/models/map-traversability.pcd", *map_traversability);
 
     host_device_data.host_map.resize(map_cloud->size()+map_traversability->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
@@ -398,6 +413,49 @@ void display() {
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
     glutSwapBuffers();
     glutPostRedisplay();
+
+    static tf2_ros::TransformBroadcaster br;
+    {
+        geometry_msgs::TransformStamped transformStamped;
+        Sophus::SE3f best = Sophus::SE3f::fitToSE3(best_pose.matrix().cast<float>());
+        auto p = best; // Sophus::SE3f::fitToSE3(increment_from_start.cast<float>().matrix());
+        transformStamped.header.stamp = ros::Time::now();
+        transformStamped.header.frame_id = "map";
+        transformStamped.child_frame_id = "base_link2";
+        transformStamped.transform.translation.x = p.translation().x();
+        transformStamped.transform.translation.y = p.translation().y();
+        transformStamped.transform.translation.z = p.translation().z();
+
+        transformStamped.transform.rotation.x = p.unit_quaternion().x();
+        transformStamped.transform.rotation.y = p.unit_quaternion().y();
+        transformStamped.transform.rotation.z = p.unit_quaternion().z();;
+        transformStamped.transform.rotation.w = p.unit_quaternion().w();;
+
+        br.sendTransform(transformStamped);
+    }
+    {
+        geometry_msgs::TransformStamped transformStamped;
+
+        Sophus::SE3f start_odom = Sophus::SE3f::fitToSE3(odometry_first.cast<float>().matrix());
+        Sophus::SE3f best = Sophus::SE3f::fitToSE3(best_pose.matrix().cast<float>());
+        Sophus::SE3f lastOdom = Sophus::SE3f::fitToSE3(odometry.matrix().cast<float>());
+        Sophus::SE3f increment_from_start =lastOdom * start_odom.inverse();
+
+        auto p =    best  *start_odom.inverse()* increment_from_start.inverse();
+        transformStamped.header.stamp = ros::Time::now();
+        transformStamped.header.frame_id = "map";
+        transformStamped.child_frame_id = "odom";
+        transformStamped.transform.translation.x = p.translation().x() ;
+        transformStamped.transform.translation.y = p.translation().y();
+        transformStamped.transform.translation.z = p.translation().z() ;
+
+        transformStamped.transform.rotation.x = p.unit_quaternion().x();
+        transformStamped.transform.rotation.y = p.unit_quaternion().y();
+        transformStamped.transform.rotation.z = p.unit_quaternion().z();;
+        transformStamped.transform.rotation.w = p.unit_quaternion().w();;
+
+        br.sendTransform(transformStamped);
+    }
 }
 
 void mouse(int glut_button, int state, int x, int y) {

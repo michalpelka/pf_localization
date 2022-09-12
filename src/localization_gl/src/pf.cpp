@@ -4,7 +4,6 @@
 #include "pf.h"
 #include "rgd.cuh"
 
-
 std::default_random_engine gen_initial_guesses;
 std::default_random_engine gen_resample_index;
 std::default_random_engine gen_resample_beta;
