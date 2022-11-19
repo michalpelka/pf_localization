@@ -87,7 +87,7 @@ int main (int argc, char *argv[])
 {
 	//ToDo data.host_map -> load map from file
 	pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-	pcl::io::loadPCDFile("/home/janusz/DATA/Lustra-mid-70/p7p2_2d_clean.pcd", *map_cloud);
+    pcl::io::loadPCDFile("//media/michal/ext/p7p2_2d_clean.pcd", *map_cloud);
 
     host_device_data.host_map.resize(map_cloud->size());
     std::transform(map_cloud->begin(),map_cloud->end(), host_device_data.host_map.begin(),
@@ -208,7 +208,7 @@ void display() {
     if(ImGui::Button("foo"))
     {
     	std::vector<Particle> exploration_particles = choose_random_exploration_particles(host_device_data);
-
+        host_device_data.particles.clear();
     	host_device_data.particles.insert(host_device_data.particles.end(), exploration_particles.begin(), exploration_particles.end());
 
 
