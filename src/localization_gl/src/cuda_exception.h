@@ -5,17 +5,9 @@
 
 #include <thrust/system_error.h>
 #include <thrust/system/cuda/error.h>
-#include <sstream>
 
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
-#include <cusolverDn.h>
-#include <cusparse.h>
 
 void throw_cuda_error(cudaError_t code, const char *file, int line);
-void throw_cuda_error(cublasStatus_t code, const char *file, int line);
-void throw_cuda_error(cusolverStatus_t code, const char *file, int line);
-void throw_cuda_error(cusparseStatus_t code, const char *file, int line);
 
 
 class MyCudaError:public std::runtime_error

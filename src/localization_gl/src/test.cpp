@@ -9,24 +9,21 @@
 #include "structs.h"
 #include "pf.h"
 
-#include "mirror_converter.h"
-#include "save_mat.h"
 
 #include <iostream>
 #include <thread>
-
-#include <pcl_ros/point_cloud.h>
 
 #include <GL/freeglut.h>
 #include <mutex>
 #include "imgui.h"
 #include "imgui_impl_glut.h"
 #include "imgui_impl_opengl2.h"
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
 #include <pcl/filters/approximate_voxel_grid.h>
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/common/transforms.h>
 
-#include <ros/package.h>
 #include "structs.h"
 #include "pf.h"
 
@@ -70,6 +67,7 @@ int gl_main(int argc, char *argv[]){
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
     glutMainLoop();
+    return 0;
 }
 
 void Bresenham3D(int ix_start, int iy_start, int iz_start, int ix_stop, int iy_stop, int iz_stop){
@@ -148,10 +146,7 @@ int main (int argc, char *argv[])
                 0,         0,         0,         1;
 
     best_pose = Eigen::Affine3d (m);
-
-    //ToDo data.host_map -> load map from file
-    std::string path = ros::package::getPath("localization_gl");
-
+    std::string path{"/home/michal/ros2_ws/src/pf_localization/src/localization_gl"};
     pcl::io::loadPCDFile(path+"/data/p7p_cloud_clean_2d.pcd", *map_cloud);
     pcl::io::loadPCDFile(path+"/data/p7p_cloud_clean_2d_traversability.pcd", *map_traversability);
     pcl::io::loadPCDFile(path+"/data/frame_248.pcd", *measurment);
